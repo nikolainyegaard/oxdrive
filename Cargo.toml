@@ -1,0 +1,38 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/native", "crates/ui", "apps/oxdrive"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT"
+repository = "https://github.com/nikolainyegaard/oxdrive"
+
+[workspace.dependencies]
+oxdrive-core = { path = "crates/core" }
+oxdrive-native = { path = "crates/native" }
+oxdrive-ui = { path = "crates/ui" }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "wayland", "thread-pool"] }
+iced_layershell = "0.19"
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+futures = "0.3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,16 @@
+[package]
+name = "oxdrive-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+oxdrive-core.workspace = true
+oxdrive-native.workspace = true
+iced.workspace = true
+iced_layershell.workspace = true
+futures.workspace = true
+
+[lints]
+workspace = true
