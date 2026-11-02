@@ -10,6 +10,7 @@ oxdrive/
 ├── clippy.toml             # the lint exceptions for tests
 ├── apps/oxdrive/           # the binary: calls oxdrive_ui::run and maps the error to an exit code
 ├── crates/core/            # pure logic, no I/O, unit tested
+│   ├── src/client.rs       # line parser: client stdout to Event, fixture tested
 │   ├── src/status.rs       # SyncState: the seven tray states and their copy
 │   └── tests/fixtures/     # real client output, scrubbed; see client.md
 ├── crates/native/          # everything that touches the OS
