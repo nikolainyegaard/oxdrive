@@ -1,0 +1,79 @@
+Reading configuration file: /home/user/.config/onedrive/accounts/work/config
+Configuration file successfully loaded
+Using 'user' configuration path for application config and state data: /home/user/.config/onedrive/accounts/work
+D-Bus message bus daemon is available; GUI notifications are now enabled
+Using IPv4 and IPv6 (if configured) for all network operations
+Attempting to contact the Microsoft OneDrive Service
+Successfully reached the Microsoft OneDrive Service
+Checking Application Version ...
+
+INFO: A new onedrive client version is available. Please upgrade your client version when possible.
+Current Application Version: 2.5.11
+Version Available:           2.5.12
+
+Attempting to initialise the OneDrive API ...
+Configuring Global Azure AD Endpoints
+The OneDrive API was initialised successfully
+Opening the item database ...
+Application Version:   onedrive v2.5.11
+Account Type:          business
+Default Drive ID:      b!DRIVEID
+Default Root ID:       ROOTID
+Microsoft Data Centre: Norway East
+Remaining Free Space:  913.98 GB (981377796762 bytes)
+Sync Engine Initialised with new Onedrive API instance
+All application operations will be performed in the configured local 'sync_dir' directory: /home/user/OneDrive
+Attempting to enable WebSocket support to monitor Microsoft Graph API changes in near real-time.
+Enabled WebSocket support to monitor Microsoft Graph API changes in near real-time.
+OneDrive synchronisation interval (seconds): 300
+Maximum allowed open files (soft):           1048576
+Maximum allowed open files (hard):           1048576
+Maximum allowed inotify user watches:        275203
+Initialising filesystem inotify monitoring ...
+Monitoring directory: .
+Monitoring directory: ./Documents
+Monitoring directory: ./Documents/Reports
+Performing initial synchronisation to ensure consistent local state ...
+Attempting to contact the Microsoft OneDrive Service
+Successfully reached the Microsoft OneDrive Service
+Starting a sync with Microsoft OneDrive
+Fetching /delta response from the OneDrive API for Drive ID: b!DRIVEID
+Processing API Response Bundle: 1 - Quantity of 'changes|items' in this bundle to process: 0
+Finished processing /delta JSON response from the OneDrive API
+No changes or items that can be applied were discovered while processing the data received from Microsoft OneDrive
+Performing a database consistency and integrity check on locally stored data
+Processing DB entries for this Drive ID: b!DRIVEID
+Processing: ~/OneDrive
+The directory has not changed
+Processing: Documents
+The directory has not changed
+Processing: Documents/Reports
+The file has not changed
+Processing: Documents/Reports/Q3 summary.xlsx
+Scanning the local file system '~/OneDrive' for new data to upload
+Performing a last examination of the most recent online data within Microsoft OneDrive to complete the reconciliation process
+Fetching /delta response from the OneDrive API for Drive ID: b!DRIVEID
+Processing API Response Bundle: 1 - Quantity of 'changes|items' in this bundle to process: 0
+Finished processing /delta JSON response from the OneDrive API
+No changes or items that can be applied were discovered while processing the data received from Microsoft OneDrive
+Sync with Microsoft OneDrive is complete
+[M] New local file added: oxdrive-fixture-test.txt
+New items to upload to Microsoft OneDrive: 1
+Total New Data to Upload:        42 Bytes
+Uploading new file: oxdrive-fixture-test.txt ... done
+[M] Total number of local file(s) added or changed: 1
+[M] Local item deleted: oxdrive-fixture-test.txt
+The operating system sent a deletion notification. Trying to delete this item as requested: oxdrive-fixture-test.txt
+Deleting item from Microsoft OneDrive: oxdrive-fixture-test.txt
+Successfully deleted item from Microsoft OneDrive: oxdrive-fixture-test.txt
+Received 1 signal(s) from WebSocket handler (2026-Nov-02 15:32:23)
+Fetching /delta response from the OneDrive API for Drive ID: b!DRIVEID
+Processing API Response Bundle: 1 - Quantity of 'changes|items' in this bundle to process: 2
+Finished processing /delta JSON response from the OneDrive API
+No changes or items that can be applied were discovered while processing the data received from Microsoft OneDrive
+
+Received termination signal, attempting to cleanly shutdown application
+Stopped monitoring directory (inotify watch removed): Documents/Reports
+Stopped monitoring directory (inotify watch removed): Documents/Reports
+Attempting to perform a database vacuum to optimise database
+Database vacuum is complete

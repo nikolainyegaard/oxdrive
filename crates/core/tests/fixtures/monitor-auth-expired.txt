@@ -1,0 +1,17 @@
+Reading configuration file: /home/user/.config/onedrive/accounts/sharepoint/config
+Configuration file successfully loaded
+D-Bus message bus daemon is available; GUI notifications are now enabled
+Using IPv4 and IPv6 (if configured) for all network operations
+Attempting to contact the Microsoft OneDrive Service
+Successfully reached the Microsoft OneDrive Service
+
+INFO: A new onedrive client version is available. Please upgrade your client version when possible.
+Current Application Version: 2.5.11
+Version Available:           2.5.12
+
+Configuring Global Azure AD Endpoints
+
+AADSTS50078: Presented multi-factor authentication has expired due to policies configured by your administrator, you must refresh your multi-factor authentication to access '00000003-0000-0000-c000-000000000000'. Trace ID: 00000000-0000-0000-0000-000000000000 Correlation ID: 00000000-0000-0000-0000-000000000000 Timestamp: 2026-11-02 14:29:46Z
+
+ERROR: You will need to issue a --reauth and re-authorise this client to obtain a fresh auth token.
+

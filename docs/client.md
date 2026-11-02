@@ -18,17 +18,37 @@ oxdrive drives `onedrive` (abraunegg), minimum v2.5.11, as a child process. The 
 
 ## Sign in
 
-The redirect URI is Microsoft's fixed `nativeclient` page, so there is no loopback or custom scheme to catch. `--auth-files` is the clean path: the client writes the sign-in URL to the first file and waits for the response URL in the second. oxdrive opens the URL in the browser and offers a paste box for the response.
+v2.5.11 redirects to a loopback listener the client opens itself (`http://127.0.0.1:<port>/?code=...`), observed on 2026-11-02 with a plain `onedrive --confdir <dir>` run. The browser lands on that URL and the client takes the code; nothing has to be pasted. `--auth-files` and `--auth-response` still exist for the case where the browser runs on another machine. The flyout therefore opens the URL and waits; a paste box is the fallback, shown only if the client keeps waiting.
 
-## Output to parse
+The MFA-expired case is a real one (fixture `monitor-auth-expired.txt`): the client prints an `AADSTS50078` line and then `ERROR: You will need to issue a --reauth and re-authorise this client to obtain a fresh auth token.` and exits. That is the Blocked state.
 
-To be filled from fixtures captured on this machine (`crates/core/tests/fixtures/`, secrets scrubbed). Known line families, from the client's source and from what OneDriveGUI matches:
+## Fixtures
 
-- `Processing <n> OneDrive items ...` while scanning
-- `Uploading file ... <path> ... done` / `Downloading file ...` / `Deleting ...`
-- `<Uploading|Downloading>: <name> ... <n>%` progress
-- `Free Space: <n> bytes` and the account type line after `--display-quota`
-- `Failed to upload|download: <path>` and `Failed items ...: <n>`
-- The multi-line error blocks and the "authorise this application" and "--resync is required" prompts
+Captured from onedrive v2.5.11 on 2026-11-02, business account, Plasma session. Secrets, drive and root IDs, trace IDs, user name and real paths are replaced; the line formats are untouched. Monitor runs used `-v`, the same flag OneDriveGUI passes, so the fixtures show the verbose set and the plain set is a subset of it. Per-directory lines (`Monitoring directory:`, `Processing:`, `The file has not changed`, `Stopped monitoring directory`) repeat once per item in reality; the fixture keeps a few of each.
 
-Each family becomes one fixture file and one test before any parser code.
+| File | Shows |
+|------|-------|
+| `display-sync-status.txt` | Healthy "no pending changes" plus the new-version banner |
+| `display-quota.txt` | Deleted, Remaining, State, Total, Used with bytes in brackets |
+| `display-config.txt` | Every `Config option '<key>' = <value>` line |
+| `monitor-upload-delete.txt` | Start-up block, initial sync, a new local file uploaded, the same file deleted, a WebSocket signal, clean shutdown |
+| `monitor-auth-expired.txt` | Start-up block ending in the AADSTS50078 error and the `--reauth` instruction |
+
+## Lines that drive state
+
+From the fixtures above. Each row becomes a parser test.
+
+| Line | Meaning |
+|------|---------|
+| `Starting a sync with Microsoft OneDrive` | Syncing |
+| `Sync with Microsoft OneDrive is complete` | Idle |
+| `Uploading new file: <name> ... done` | Activity entry, upload |
+| `Successfully deleted item from Microsoft OneDrive: <name>` | Activity entry, delete |
+| `[M] New local file added: <name>` | inotify event, informational |
+| `Remaining Free Space:  <n> GB (<bytes> bytes)` | Quota, printed at start-up |
+| `Account Type:          <business|personal>` | Account line |
+| `ERROR: You will need to issue a --reauth ...` | Blocked |
+| `Received termination signal, attempting to cleanly shutdown application` | Disabled follows when the process exits |
+| `INFO: A new onedrive client version is available.` | Ignore |
+
+Still to capture: a download, a modified-file upload, a failed upload (`Failed to upload`), the `--resync is required` prompt, and a non-verbose run.

@@ -1,0 +1,20 @@
+Reading configuration file: /home/user/.config/onedrive/accounts/work/config
+Configuration file successfully loaded
+D-Bus message bus daemon is available; GUI notifications are now enabled
+Using IPv4 and IPv6 (if configured) for all network operations
+Attempting to contact the Microsoft OneDrive Service
+Successfully reached the Microsoft OneDrive Service
+
+INFO: A new onedrive client version is available. Please upgrade your client version when possible.
+Current Application Version: 2.5.11
+Version Available:           2.5.12
+
+Configuring Global Azure AD Endpoints
+Microsoft OneDrive quota information as reported for this Drive ID: b!DRIVEID
+
+Deleted:   0.84 GB (906018065 bytes)
+Remaining: 913.98 GB (981377796762 bytes)
+State:     normal
+Total:     1024.00 GB (1099511627776 bytes)
+Used:      109.18 GB (117227812949 bytes)
+
