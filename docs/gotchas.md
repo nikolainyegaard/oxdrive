@@ -2,6 +2,14 @@
 
 Dated. Newest first. Each entry is something that looks wrong until you know why, or a dead end nobody should walk into again.
 
+## 2026-11-02: client stderr is read like stdout
+
+The fixtures were captured with `2>&1`, so which stream carries the AADSTS and `ERROR:` lines is unknown. Both pipes go through the same parser; a line is a line. Do not drop stderr when tidying this up.
+
+## 2026-11-02: the client is stopped with `kill -TERM`, not `Child::kill`
+
+`Child::kill` is SIGKILL. The client wants SIGTERM to checkpoint and vacuum its sqlite database (it prints "Received termination signal" and takes a few seconds). Running `kill` is the one-line way to send SIGTERM without a `libc` or `nix` dependency.
+
 ## 2026-10-30: winit-core is pinned to 0.31.0-beta.2
 
 `iced_exdevtools 0.19.1`, pulled in by `iced_layershell`, fails to compile against `winit-core 0.31.0-beta.4` (a non-exhaustive match on `NativeKeyCode` in its keymap). Cargo picks beta.4 by default. The pin lives in `apps/oxdrive/Cargo.toml` as a direct dependency with an exact version, because that is the only way to force a pre-release. Check the iced_layershell changelog before every `cargo update` and drop the pin once it releases against a stable winit 0.31.

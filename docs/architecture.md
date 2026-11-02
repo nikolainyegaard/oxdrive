@@ -11,9 +11,11 @@ oxdrive/
 ├── apps/oxdrive/           # the binary: calls oxdrive_ui::run and maps the error to an exit code
 ├── crates/core/            # pure logic, no I/O, unit tested
 │   ├── src/client.rs       # line parser: client stdout to Event, fixture tested
+│   ├── src/profiles.rs     # OneDriveGUI profiles file: name and config dir per account
 │   ├── src/status.rs       # SyncState: the seven tray states and their copy
 │   └── tests/fixtures/     # real client output, scrubbed; see client.md
 ├── crates/native/          # everything that touches the OS
+│   ├── src/client.rs       # spawns onedrive --monitor, reads its output on two threads
 │   └── src/tray.rs         # StatusNotifierItem through ksni, on its own thread
 ├── crates/ui/              # iced views, theme, the layer-shell daemon
 │   ├── src/lib.rs          # App state, Message, update, the tray channel bridge, run()
@@ -31,7 +33,9 @@ There is no async runtime in our code. The ksni tray service runs on its own thr
 
 The flyout is a wlr-layer-shell surface. `update` creates it with `Message::NewLayerShell` on a tray click and removes it with `Message::RemoveWindow` on the next click or on Hide. Those two variants come from the `to_layer_message(multi)` macro on `Message`.
 
-Future blocking work (spawning the client, reading its stdout, writing config files) follows the same shape: a `std::thread` in `crates/native` sending typed events over a channel into a subscription.
+The client follows the same shape. `native::client::spawn` starts `onedrive --monitor` with stdout and stderr piped, one reader thread each, both parsing through `core::client::parse_line` and sending `ClientEvent`s into a second parked receiver. `App::on_client` applies them: state changes go to `set_state`, uploads and deletes become activity rows (newest first, ten kept), an exit sets Disabled with the reason as the detail line. Reads are capped at 16 KiB per line.
+
+Quit drops the `ClientHandle` before `iced::exit`; the drop sends SIGTERM through `kill` and waits, so the client checkpoints its database. That wait is a few seconds and blocks the UI thread, which is fine for the last thing the app does.
 
 ## Dependencies
 

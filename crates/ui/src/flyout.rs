@@ -14,6 +14,12 @@ pub fn view(app: &App) -> Element<'_, Message> {
             .color(theme::TEXT_SECONDARY),
         text(app.state.headline()).size(theme::TEXT_BODY),
     ]
+    .extend(app.detail.as_deref().map(|detail| {
+        text(detail)
+            .size(theme::TEXT_BODY)
+            .color(theme::TEXT_SECONDARY)
+            .into()
+    }))
     .spacing(theme::GAP / 2.0);
 
     let recent: Element<'_, Message> = if app.recent.is_empty() {
