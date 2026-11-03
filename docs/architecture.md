@@ -37,7 +37,7 @@ The client follows the same shape. `native::client::spawn` starts `onedrive --mo
 
 Pause drops the `ClientHandle` (SIGTERM, reaped on a thread) and sets Paused; resume spawns a new client for the same profile. `App` keeps a clone of the client sender so the subscription stream survives between processes, and `on_client` ignores everything while Paused, because the stopping client still reports its shutdown.
 
-Sign in reruns the client with `--reauth` through the same `start_client` path as resume, with the state set to Blocked. The client opens the browser and waits on its own loopback listener; the parser turns its "Opening the Microsoft authorisation URL" line into `SignInOpened`, which keeps Blocked and sets the detail line, and the first `SyncStarted` clears it. oxdrive never sees the URL or the code.
+Sign in reruns the client with `--reauth` through the same `start_client` path as resume, with the state set to Blocked. The client opens the browser and waits on its own loopback listener; the parser turns its "Opening the Microsoft authorisation URL" line into `SignInOpened`, which keeps Blocked and sets the detail line, and the first `SyncStarted` clears it and opens the flyout at the last click position, as the Windows client does. oxdrive never sees the URL or the code.
 
 Quit drops the `ClientHandle` before `iced::exit`; the drop sends SIGTERM through `kill` and hands the `Child` to a reaper thread, so the UI never waits. The client finishes its checkpoint on its own, even after oxdrive has exited. The client runs with `--disable-notifications`: oxdrive owns what the desktop shows.
 

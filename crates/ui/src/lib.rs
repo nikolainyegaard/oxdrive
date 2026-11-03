@@ -49,6 +49,8 @@ pub struct App {
     pub detail: Option<String>,
     profile: Option<Profile>,
     flyout: Option<IcedId>,
+    /// Where the icon was last clicked, so the flyout can open without a click after a sign-in.
+    icon_x: i32,
     /// Dropping the handle removes the icon, so it lives as long as the app.
     tray: Option<TrayHandle>,
     client: Option<ClientHandle>,
@@ -96,11 +98,14 @@ impl App {
         }
     }
 
-    fn on_client(&mut self, event: ClientEvent) {
+    /// Applies a client event. True when a sign-in just landed: the first sync after Blocked.
+    fn on_client(&mut self, event: ClientEvent) -> bool {
         // The stopping client still reports its shutdown; a pause is not an error.
         if self.state == SyncState::Paused {
-            return;
+            return false;
         }
+        let signed_in =
+            self.state == SyncState::Blocked && event == ClientEvent::Event(Event::SyncStarted);
         match event {
             ClientEvent::Event(event) => {
                 match &event {
@@ -131,42 +136,48 @@ impl App {
                 }
             }
         }
+        signed_in
     }
+}
+
+/// Creates the flyout surface, centred on x when the host gave a position, else in the corner.
+fn open_flyout(app: &mut App, x: i32) -> Task<Message> {
+    let id = IcedId::unique();
+    app.flyout = Some(id);
+    // ponytail: x is global but the margin is per output, so this is right only when the
+    // panel's output sits at x = 0; subtract the output origin once iced_layershell exposes it
+    let (anchor, margin) = if x > 0 {
+        let half = i32::try_from(theme::FLYOUT_SIZE.0 / 2).unwrap_or(0);
+        let left = (x - half).max(theme::FLYOUT_MARGIN);
+        (
+            Anchor::Bottom | Anchor::Left,
+            (0, 0, theme::FLYOUT_MARGIN, left),
+        )
+    } else {
+        (
+            Anchor::Bottom | Anchor::Right,
+            (0, 0, theme::FLYOUT_MARGIN, 0),
+        )
+    };
+    Task::done(Message::NewLayerShell {
+        id,
+        settings: NewLayerShellSettings {
+            size: Some(theme::FLYOUT_SIZE),
+            layer: Layer::Top,
+            anchor,
+            margin: Some(margin),
+            exclusive_zone: Some(0),
+            keyboard_interactivity: KeyboardInteractivity::OnDemand,
+            ..Default::default()
+        },
+    })
 }
 
 fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::Tray(TrayEvent::Activate { x }) if app.flyout.is_none() => {
-            let id = IcedId::unique();
-            app.flyout = Some(id);
-            // Centre on the icon when the host gave a position, else sit in the corner.
-            // ponytail: x is global but the margin is per output, so this is right only when the
-            // panel's output sits at x = 0; subtract the output origin once iced_layershell exposes it
-            let (anchor, margin) = if x > 0 {
-                let half = i32::try_from(theme::FLYOUT_SIZE.0 / 2).unwrap_or(0);
-                let left = (x - half).max(theme::FLYOUT_MARGIN);
-                (
-                    Anchor::Bottom | Anchor::Left,
-                    (0, 0, theme::FLYOUT_MARGIN, left),
-                )
-            } else {
-                (
-                    Anchor::Bottom | Anchor::Right,
-                    (0, 0, theme::FLYOUT_MARGIN, 0),
-                )
-            };
-            Task::done(Message::NewLayerShell {
-                id,
-                settings: NewLayerShellSettings {
-                    size: Some(theme::FLYOUT_SIZE),
-                    layer: Layer::Top,
-                    anchor,
-                    margin: Some(margin),
-                    exclusive_zone: Some(0),
-                    keyboard_interactivity: KeyboardInteractivity::OnDemand,
-                    ..Default::default()
-                },
-            })
+            app.icon_x = x;
+            open_flyout(app, x)
         }
         Message::Tray(TrayEvent::Activate { .. }) | Message::Hide => match app.flyout.take() {
             Some(id) => Task::done(Message::RemoveWindow(id)),
@@ -186,8 +197,12 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::Client(event) => {
-            app.on_client(event);
-            Task::none()
+            // A finished sign-in shows the flyout, as if the icon had been clicked.
+            if app.on_client(event) && app.flyout.is_none() {
+                open_flyout(app, app.icon_x)
+            } else {
+                Task::none()
+            }
         }
         _ => Task::none(),
     }
@@ -267,6 +282,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         detail: detail.clone(),
         profile: profile.clone(),
         flyout: None,
+        icon_x: 0,
         tray: tray.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client: client.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client_tx: client_tx.clone(),
