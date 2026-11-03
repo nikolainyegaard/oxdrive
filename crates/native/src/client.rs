@@ -20,16 +20,20 @@ pub enum ClientEvent {
     Exited(String),
 }
 
-/// The running monitor process. Dropping it asks the client to stop and waits for it.
-pub struct ClientHandle(Child);
+/// The running monitor process. Dropping it asks the client to stop; a reaper thread waits
+/// so the UI thread never does. The client takes a second or two to checkpoint and exit.
+pub struct ClientHandle(Option<Child>);
 
 impl Drop for ClientHandle {
     fn drop(&mut self) {
+        let Some(mut child) = self.0.take() else {
+            return;
+        };
         // SIGTERM lets the client checkpoint its database; `Child::kill` would be SIGKILL.
         let _ = Command::new("kill")
-            .args(["-TERM", &self.0.id().to_string()])
+            .args(["-TERM", &child.id().to_string()])
             .status();
-        let _ = self.0.wait();
+        thread::spawn(move || child.wait());
     }
 }
 
@@ -45,6 +49,7 @@ pub fn spawn(
         .arg("--confdir")
         .arg(config_dir)
         .arg("--monitor")
+        .arg("--disable-notifications")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -57,7 +62,7 @@ pub fn spawn(
     if let Some(err) = child.stderr.take() {
         thread::spawn(move || read_lines(err, &events));
     }
-    Ok(ClientHandle(child))
+    Ok(ClientHandle(Some(child)))
 }
 
 fn read_lines(source: impl Read, events: &UnboundedSender<ClientEvent>) {

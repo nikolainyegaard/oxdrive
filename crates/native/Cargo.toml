@@ -9,6 +9,7 @@ license.workspace = true
 oxdrive-core.workspace = true
 ksni.workspace = true
 futures.workspace = true
+signal-hook.workspace = true
 
 [lints]
 workspace = true

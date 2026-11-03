@@ -17,6 +17,7 @@ iced = { version = "0.14", default-features = false, features = ["wgpu", "waylan
 iced_layershell = "0.19"
 ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
 futures = "0.3"
+signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

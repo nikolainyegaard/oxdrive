@@ -48,7 +48,6 @@ pub fn view(app: &App) -> Element<'_, Message> {
         button(text("View online").size(theme::TEXT_BODY)),
         space::horizontal(),
         button(text(pause_label).size(theme::TEXT_BODY)).on_press(Message::TogglePause),
-        button(text("Hide").size(theme::TEXT_BODY)).on_press(Message::Hide),
     ]
     .spacing(theme::GAP);
 

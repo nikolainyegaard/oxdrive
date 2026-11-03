@@ -35,6 +35,7 @@ pub enum Message {
     Tray(TrayEvent),
     Client(ClientEvent),
     TogglePause,
+    /// Close the flyout: the surface lost keyboard focus, which is how "click outside" reaches us.
     Hide,
 }
 
@@ -67,7 +68,7 @@ impl App {
         self.recent.truncate(RECENT_MAX);
     }
 
-    /// Stops the client (SIGTERM, wait) or starts it again for the current profile.
+    /// Stops the client (SIGTERM) or starts it again for the current profile.
     fn toggle_pause(&mut self) {
         if self.state == SyncState::Paused {
             let Some(profile) = &self.profile else { return };
@@ -145,7 +146,7 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             None => Task::none(),
         },
         Message::Tray(TrayEvent::Quit) => {
-            // Drop first: the handle sends SIGTERM and waits for the client to checkpoint.
+            // Drop first: the handle sends SIGTERM so the client checkpoints on its way out.
             app.client = None;
             iced::exit()
         }
@@ -169,6 +170,11 @@ fn subscription(_: &App) -> Subscription<Message> {
     Subscription::batch([
         Subscription::run(tray_events),
         Subscription::run(client_events),
+        // The flyout takes keyboard focus on demand; a click anywhere else takes it away.
+        iced::event::listen_with(|event, _, _| match event {
+            iced::Event::Window(iced::window::Event::Unfocused) => Some(Message::Hide),
+            _ => None,
+        }),
     ])
 }
 
@@ -202,6 +208,7 @@ pub fn run() -> oxdrive_core::Result<()> {
     let (tx, rx) = mpsc::unbounded();
     *TRAY_RX.lock().unwrap_or_else(PoisonError::into_inner) = Some(rx);
     // The boot closure must be `Fn`, so the handle is handed over through an Option.
+    tray::quit_on_signal(tx.clone())?;
     let tray = Mutex::new(Some(tray::spawn(tx)?));
     // ponytail: first profile only; a profile switcher comes with settings
     let profile = client::profiles().into_iter().next();

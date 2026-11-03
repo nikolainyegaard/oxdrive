@@ -29,3 +29,15 @@ winit 0.30 on Wayland implements `set_visible`, `set_minimized(false)`, `focus_w
 ## 2026-10-30: a D-Bus Activate carries no activation token
 
 Triggering the tray from a shell with `busctl ... Activate ii 0 0` opens the flyout but, under Wayland, nothing can hand focus to it without an xdg-activation token. Plasma passes a token on a real click (`ksni::current_xdg_activation_token`). Focus behaviour is only tested by clicking.
+
+## 2026-11-03: never wait for the client on the UI thread
+
+`Child::wait` after SIGTERM takes one to two seconds while the client checkpoints. Done in `Drop` on the UI thread it froze the app on every pause. The handle now moves the `Child` to a throwaway thread that does the wait. On Quit that thread dies with the process; the client still finishes its shutdown as an orphan.
+
+## 2026-11-03: the client sends its own desktop notifications
+
+In monitor mode the client notifies on every start and stop of a sync through libnotify. Spawned with `--disable-notifications`, which is a plain flag and does not touch the user's config file.
+
+## 2026-11-03: a signal to oxdrive must reach the client
+
+`kill oxdrive` or a session logout used to leave `onedrive --monitor` running as an orphan, and the next oxdrive start then found the config directory locked and showed "OneDrive isn't running". `tray::quit_on_signal` forwards SIGTERM, SIGINT and SIGHUP as a Quit, which drops the client handle like the menu item does.

@@ -80,6 +80,23 @@ impl ksni::Tray for Tray {
     }
 }
 
+/// Turns SIGTERM, SIGINT and SIGHUP into a Quit, so a logout or a `kill` still stops the client.
+/// Without this the client would outlive oxdrive and hold the config directory.
+///
+/// # Errors
+/// The signal handler could not be registered.
+pub fn quit_on_signal(events: UnboundedSender<TrayEvent>) -> oxdrive_core::Result<()> {
+    use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
+    let mut signals = signal_hook::iterator::Signals::new([SIGTERM, SIGINT, SIGHUP])
+        .map_err(|e| format!("could not listen for termination signals: {e}"))?;
+    std::thread::spawn(move || {
+        if signals.forever().next().is_some() {
+            let _ = events.unbounded_send(TrayEvent::Quit);
+        }
+    });
+    Ok(())
+}
+
 /// Handle to the running tray service. Dropping it removes the icon.
 pub struct TrayHandle(ksni::blocking::Handle<Tray>);
 
