@@ -125,23 +125,39 @@ impl App {
 
 fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
-        Message::Tray(TrayEvent::Activate) if app.flyout.is_none() => {
+        Message::Tray(TrayEvent::Activate { x }) if app.flyout.is_none() => {
             let id = IcedId::unique();
             app.flyout = Some(id);
+            // Centre on the icon when the host gave a position, else sit in the corner.
+            // ponytail: x is global but the margin is per output, so this is right only when the
+            // panel's output sits at x = 0; subtract the output origin once iced_layershell exposes it
+            let (anchor, margin) = if x > 0 {
+                let half = i32::try_from(theme::FLYOUT_SIZE.0 / 2).unwrap_or(0);
+                let left = (x - half).max(theme::FLYOUT_MARGIN);
+                (
+                    Anchor::Bottom | Anchor::Left,
+                    (0, 0, theme::FLYOUT_MARGIN, left),
+                )
+            } else {
+                (
+                    Anchor::Bottom | Anchor::Right,
+                    (0, 0, theme::FLYOUT_MARGIN, 0),
+                )
+            };
             Task::done(Message::NewLayerShell {
                 id,
                 settings: NewLayerShellSettings {
                     size: Some(theme::FLYOUT_SIZE),
                     layer: Layer::Top,
-                    anchor: Anchor::Bottom | Anchor::Right,
-                    margin: Some((0, 0, theme::FLYOUT_MARGIN, theme::FLYOUT_MARGIN)),
+                    anchor,
+                    margin: Some(margin),
                     exclusive_zone: Some(0),
                     keyboard_interactivity: KeyboardInteractivity::OnDemand,
                     ..Default::default()
                 },
             })
         }
-        Message::Tray(TrayEvent::Activate) | Message::Hide => match app.flyout.take() {
+        Message::Tray(TrayEvent::Activate { .. }) | Message::Hide => match app.flyout.take() {
             Some(id) => Task::done(Message::RemoveWindow(id)),
             None => Task::none(),
         },

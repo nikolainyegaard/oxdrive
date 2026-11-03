@@ -41,3 +41,7 @@ In monitor mode the client notifies on every start and stop of a sync through li
 ## 2026-11-03: a signal to oxdrive must reach the client
 
 `kill oxdrive` or a session logout used to leave `onedrive --monitor` running as an orphan, and the next oxdrive start then found the config directory locked and showed "OneDrive isn't running". `tray::quit_on_signal` forwards SIGTERM, SIGINT and SIGHUP as a Quit, which drops the client handle like the menu item does.
+
+## 2026-11-03: the click position is global, the layer-shell margin is per output
+
+Plasma passes the click position to `Activate` in global compositor pixels (observed 4735,1413 on a 5120 wide panel output). A layer-shell margin counts from the edge of the output the surface lands on. iced_layershell does not expose output geometry, so the flyout is centred on the icon only when the panel's output is at x = 0, which it is on this machine. A margin past the output's right edge would push the surface off screen; nothing clamps it yet.

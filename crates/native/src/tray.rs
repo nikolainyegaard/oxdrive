@@ -10,8 +10,11 @@ pub const APP_ID: &str = "oxdrive";
 /// What the tray thread tells the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayEvent {
-    /// Left click on the icon.
-    Activate,
+    /// Left click on the icon, with the click position in global screen pixels. Plasma passes the
+    /// real position; a D-Bus `Activate ii 0 0` from a shell gives `x: 0`.
+    Activate {
+        x: i32,
+    },
     /// "Pause syncing" or "Resume syncing", whichever the menu showed.
     TogglePause,
     Quit,
@@ -39,8 +42,8 @@ impl ksni::Tray for Tray {
             ..Default::default()
         }
     }
-    fn activate(&mut self, _x: i32, _y: i32) {
-        let _ = self.events.unbounded_send(TrayEvent::Activate);
+    fn activate(&mut self, x: i32, _y: i32) {
+        let _ = self.events.unbounded_send(TrayEvent::Activate { x });
     }
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::menu::*;

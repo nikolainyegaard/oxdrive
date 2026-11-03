@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Pause and resume syncing from the tray menu or the flyout
 - Client runs with its own desktop notifications off
 - Flyout closes on a click anywhere else; the Hide button is gone
+- Flyout centres on the tray icon when the host reports the click position
 - SIGTERM, SIGINT and SIGHUP stop the client before oxdrive exits
 - Recent activity list with uploads and deletes
 - Quit stops the client cleanly
