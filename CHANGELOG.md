@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Flyout anchored above the tray, toggled by clicking the icon
 - Runs the onedrive client in monitor mode for the first OneDriveGUI profile, or `~/.config/onedrive`
 - Tray state follows the client: looking for changes, synced, sign in needed, not running
+- Pause and resume syncing from the tray menu or the flyout
 - Recent activity list with uploads and deletes
 - Quit stops the client cleanly
 

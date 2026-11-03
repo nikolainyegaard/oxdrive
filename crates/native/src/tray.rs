@@ -12,6 +12,8 @@ pub const APP_ID: &str = "oxdrive";
 pub enum TrayEvent {
     /// Left click on the icon.
     Activate,
+    /// "Pause syncing" or "Resume syncing", whichever the menu showed.
+    TogglePause,
     Quit,
 }
 
@@ -42,7 +44,29 @@ impl ksni::Tray for Tray {
     }
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::menu::*;
+        let paused = self.state == SyncState::Paused;
         vec![
+            StandardItem {
+                label: if paused {
+                    "Resume syncing"
+                } else {
+                    "Pause syncing"
+                }
+                .into(),
+                icon_name: if paused {
+                    "media-playback-start"
+                } else {
+                    "media-playback-pause"
+                }
+                .into(),
+                enabled: paused || self.state != SyncState::Disabled,
+                activate: Box::new(|tray: &mut Self| {
+                    let _ = tray.events.unbounded_send(TrayEvent::TogglePause);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            MenuItem::Separator,
             StandardItem {
                 label: "Quit OneDrive".into(),
                 icon_name: "application-exit".into(),

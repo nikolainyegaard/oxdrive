@@ -3,6 +3,8 @@
 use iced::widget::{button, column, row, space, text};
 use iced::{Element, Length};
 
+use oxdrive_core::status::SyncState;
+
 use crate::theme;
 use crate::{App, Message};
 
@@ -37,10 +39,15 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .into()
     };
 
+    let pause_label = match app.state {
+        SyncState::Paused => "Resume",
+        _ => "Pause",
+    };
     let footer = row![
         button(text("Open folder").size(theme::TEXT_BODY)),
         button(text("View online").size(theme::TEXT_BODY)),
         space::horizontal(),
+        button(text(pause_label).size(theme::TEXT_BODY)).on_press(Message::TogglePause),
         button(text("Hide").size(theme::TEXT_BODY)).on_press(Message::Hide),
     ]
     .spacing(theme::GAP);

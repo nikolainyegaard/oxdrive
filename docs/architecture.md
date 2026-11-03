@@ -35,6 +35,8 @@ The flyout is a wlr-layer-shell surface. `update` creates it with `Message::NewL
 
 The client follows the same shape. `native::client::spawn` starts `onedrive --monitor` with stdout and stderr piped, one reader thread each, both parsing through `core::client::parse_line` and sending `ClientEvent`s into a second parked receiver. `App::on_client` applies them: state changes go to `set_state`, uploads and deletes become activity rows (newest first, ten kept), an exit sets Disabled with the reason as the detail line. Reads are capped at 16 KiB per line.
 
+Pause drops the `ClientHandle` (SIGTERM, wait) and sets Paused; resume spawns a new client for the same profile. `App` keeps a clone of the client sender so the subscription stream survives between processes, and `on_client` ignores everything while Paused, because the stopping client still reports its shutdown.
+
 Quit drops the `ClientHandle` before `iced::exit`; the drop sends SIGTERM through `kill` and waits, so the client checkpoints its database. That wait is a few seconds and blocks the UI thread, which is fine for the last thing the app does.
 
 ## Dependencies

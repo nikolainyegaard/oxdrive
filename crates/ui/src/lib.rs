@@ -16,6 +16,7 @@ use iced_layershell::reexport::{
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 use iced_layershell::to_layer_message;
 use oxdrive_core::client::Event;
+use oxdrive_core::profiles::Profile;
 use oxdrive_core::status::SyncState;
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
@@ -33,6 +34,7 @@ const RECENT_MAX: usize = 10;
 pub enum Message {
     Tray(TrayEvent),
     Client(ClientEvent),
+    TogglePause,
     Hide,
 }
 
@@ -42,10 +44,13 @@ pub struct App {
     pub recent: Vec<String>,
     /// Shown under the headline when the client has something to say.
     pub detail: Option<String>,
+    profile: Option<Profile>,
     flyout: Option<IcedId>,
     /// Dropping the handle removes the icon, so it lives as long as the app.
     tray: Option<TrayHandle>,
     client: Option<ClientHandle>,
+    /// Kept so the client subscription stream outlives any one client process.
+    client_tx: mpsc::UnboundedSender<ClientEvent>,
 }
 
 impl App {
@@ -62,7 +67,31 @@ impl App {
         self.recent.truncate(RECENT_MAX);
     }
 
+    /// Stops the client (SIGTERM, wait) or starts it again for the current profile.
+    fn toggle_pause(&mut self) {
+        if self.state == SyncState::Paused {
+            let Some(profile) = &self.profile else { return };
+            match client::spawn(&profile.config_dir, self.client_tx.clone()) {
+                Ok(handle) => {
+                    self.client = Some(handle);
+                    self.detail = None;
+                    self.set_state(SyncState::Syncing);
+                }
+                Err(why) => {
+                    self.detail = Some(why);
+                    self.set_state(SyncState::Disabled);
+                }
+            }
+        } else if self.client.take().is_some() {
+            self.set_state(SyncState::Paused);
+        }
+    }
+
     fn on_client(&mut self, event: ClientEvent) {
+        // The stopping client still reports its shutdown; a pause is not an error.
+        if self.state == SyncState::Paused {
+            return;
+        }
         match event {
             ClientEvent::Event(event) => {
                 match &event {
@@ -120,6 +149,10 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.client = None;
             iced::exit()
         }
+        Message::Tray(TrayEvent::TogglePause) | Message::TogglePause => {
+            app.toggle_pause();
+            Task::none()
+        }
         Message::Client(event) => {
             app.on_client(event);
             Task::none()
@@ -175,7 +208,7 @@ pub fn run() -> oxdrive_core::Result<()> {
     let (client_tx, client_rx) = mpsc::unbounded();
     *CLIENT_RX.lock().unwrap_or_else(PoisonError::into_inner) = Some(client_rx);
     let (client, state, detail) = match &profile {
-        Some(p) => match client::spawn(&p.config_dir, client_tx) {
+        Some(p) => match client::spawn(&p.config_dir, client_tx.clone()) {
             Ok(handle) => (Some(handle), SyncState::Syncing, None),
             Err(why) => (None, SyncState::Disabled, Some(why)),
         },
@@ -186,15 +219,19 @@ pub fn run() -> oxdrive_core::Result<()> {
         ),
     };
     let client = Mutex::new(client);
-    let account = profile.map_or_else(|| "Not signed in".into(), |p| p.name);
+    let account = profile
+        .as_ref()
+        .map_or_else(|| "Not signed in".into(), |p| p.name.clone());
     let boot = move || App {
         state,
         account: account.clone(),
         recent: Vec::new(),
         detail: detail.clone(),
+        profile: profile.clone(),
         flyout: None,
         tray: tray.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client: client.lock().unwrap_or_else(PoisonError::into_inner).take(),
+        client_tx: client_tx.clone(),
     };
     iced_layershell::daemon(boot, tray::APP_ID, update, view)
         .subscription(subscription)
