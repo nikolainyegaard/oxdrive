@@ -37,19 +37,26 @@ impl Drop for ClientHandle {
     }
 }
 
-/// Starts `onedrive --monitor` for one config directory.
+/// Starts `onedrive --monitor` for one config directory. With `reauth` the client drops its
+/// token first, opens the browser itself and keeps syncing once the sign-in lands.
 ///
 /// # Errors
 /// The client binary is missing or could not be started.
 pub fn spawn(
     config_dir: &Path,
+    reauth: bool,
     events: UnboundedSender<ClientEvent>,
 ) -> oxdrive_core::Result<ClientHandle> {
-    let mut child = Command::new("onedrive")
+    let mut command = Command::new("onedrive");
+    command
         .arg("--confdir")
         .arg(config_dir)
         .arg("--monitor")
-        .arg("--disable-notifications")
+        .arg("--disable-notifications");
+    if reauth {
+        command.arg("--reauth");
+    }
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -35,6 +35,8 @@ pub enum Message {
     Tray(TrayEvent),
     Client(ClientEvent),
     TogglePause,
+    /// Run the client with `--reauth`; it opens the browser and waits for the sign-in.
+    SignIn,
     /// Close the flyout: the surface lost keyboard focus, which is how "click outside" reaches us.
     Hide,
 }
@@ -68,21 +70,27 @@ impl App {
         self.recent.truncate(RECENT_MAX);
     }
 
+    /// Starts a client for the current profile; dropping any old handle stops it first.
+    fn start_client(&mut self, reauth: bool, state: SyncState) {
+        let Some(profile) = &self.profile else { return };
+        self.client = None;
+        match client::spawn(&profile.config_dir, reauth, self.client_tx.clone()) {
+            Ok(handle) => {
+                self.client = Some(handle);
+                self.detail = None;
+                self.set_state(state);
+            }
+            Err(why) => {
+                self.detail = Some(why);
+                self.set_state(SyncState::Disabled);
+            }
+        }
+    }
+
     /// Stops the client (SIGTERM) or starts it again for the current profile.
     fn toggle_pause(&mut self) {
         if self.state == SyncState::Paused {
-            let Some(profile) = &self.profile else { return };
-            match client::spawn(&profile.config_dir, self.client_tx.clone()) {
-                Ok(handle) => {
-                    self.client = Some(handle);
-                    self.detail = None;
-                    self.set_state(SyncState::Syncing);
-                }
-                Err(why) => {
-                    self.detail = Some(why);
-                    self.set_state(SyncState::Disabled);
-                }
-            }
+            self.start_client(false, SyncState::Syncing);
         } else if self.client.take().is_some() {
             self.set_state(SyncState::Paused);
         }
@@ -102,8 +110,11 @@ impl App {
                         self.detail =
                             Some("Your sign-in expired. Sign in again to continue syncing.".into());
                     }
-                    Event::SyncStarted
-                    | Event::SyncComplete
+                    Event::SignInOpened => {
+                        self.detail = Some("Finish signing in in your browser.".into());
+                    }
+                    Event::SyncStarted => self.detail = None,
+                    Event::SyncComplete
                     | Event::FreeSpace(_)
                     | Event::AccountType(_)
                     | Event::ShuttingDown => {}
@@ -170,6 +181,10 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.toggle_pause();
             Task::none()
         }
+        Message::SignIn => {
+            app.start_client(true, SyncState::Blocked);
+            Task::none()
+        }
         Message::Client(event) => {
             app.on_client(event);
             Task::none()
@@ -231,7 +246,7 @@ pub fn run() -> oxdrive_core::Result<()> {
     let (client_tx, client_rx) = mpsc::unbounded();
     *CLIENT_RX.lock().unwrap_or_else(PoisonError::into_inner) = Some(client_rx);
     let (client, state, detail) = match &profile {
-        Some(p) => match client::spawn(&p.config_dir, client_tx.clone()) {
+        Some(p) => match client::spawn(&p.config_dir, false, client_tx.clone()) {
             Ok(handle) => (Some(handle), SyncState::Syncing, None),
             Err(why) => (None, SyncState::Disabled, Some(why)),
         },

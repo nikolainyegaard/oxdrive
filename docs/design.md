@@ -36,4 +36,4 @@ The seven states are the Windows set. Our icons: seven SVGs under `assets/tray/`
 
 ## Flyout layout
 
-Top to bottom: "OneDrive" title, account line, status headline, recent activity list (or "No recent activity"), spacer, footer with Open folder, View online, and Hide at the right. Settings goes into the footer when there is something to set.
+Top to bottom: "OneDrive" title, account line, status headline, recent activity list (or "No recent activity"), spacer, footer with Open folder, View online, and one action button at the right: Pause, Resume when paused, Sign in when blocked. Settings goes into the footer when there is something to set.

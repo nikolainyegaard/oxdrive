@@ -1,0 +1,14 @@
+Disabling GUI notifications as per user configuration
+Deleting the saved authentication status ... re-authentication requested
+Using IPv4 and IPv6 (if configured) for all network operations
+Attempting to contact the Microsoft OneDrive Service
+Successfully reached the Microsoft OneDrive Service
+
+INFO: A new onedrive client version is available. Please upgrade your client version when possible.
+Current Application Version: 2.5.11
+Version Available:           2.5.12
+
+Configuring Global Azure AD Endpoints
+
+Opening the Microsoft authorisation URL in your default browser ...
+Waiting for the Microsoft authorisation response on http://127.0.0.1:53100/

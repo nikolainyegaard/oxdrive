@@ -16,6 +16,8 @@ pub enum Event {
     AccountType(String),
     /// The client wants `--reauth` and will exit.
     AuthRequired,
+    /// The client opened the browser and is waiting on its loopback listener.
+    SignInOpened,
     ShuttingDown,
 }
 
@@ -25,7 +27,7 @@ impl Event {
         match self {
             Self::SyncStarted => Some(SyncState::Syncing),
             Self::SyncComplete => Some(SyncState::Idle),
-            Self::AuthRequired => Some(SyncState::Blocked),
+            Self::AuthRequired | Self::SignInOpened => Some(SyncState::Blocked),
             Self::ShuttingDown => Some(SyncState::Disabled),
             Self::Uploaded(_) | Self::Deleted(_) | Self::FreeSpace(_) | Self::AccountType(_) => {
                 None
@@ -61,6 +63,9 @@ pub fn parse_line(line: &str) -> Option<Event> {
     }
     if line.starts_with("ERROR: You will need to issue a --reauth") {
         return Some(Event::AuthRequired);
+    }
+    if line.starts_with("Opening the Microsoft authorisation URL") {
+        return Some(Event::SignInOpened);
     }
     if line.starts_with("Received termination signal") {
         return Some(Event::ShuttingDown);
@@ -103,6 +108,13 @@ mod tests {
     fn expired_auth_blocks() {
         let got = events(include_str!("../tests/fixtures/monitor-auth-expired.txt"));
         assert_eq!(got, vec![Event::AuthRequired]);
+        assert_eq!(got[0].state(), Some(SyncState::Blocked));
+    }
+
+    #[test]
+    fn sign_in_run_blocks_until_the_browser_answers() {
+        let got = events(include_str!("../tests/fixtures/monitor-sign-in.txt"));
+        assert_eq!(got, vec![Event::SignInOpened]);
         assert_eq!(got[0].state(), Some(SyncState::Blocked));
     }
 

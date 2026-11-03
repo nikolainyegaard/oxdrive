@@ -39,15 +39,16 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .into()
     };
 
-    let pause_label = match app.state {
-        SyncState::Paused => "Resume",
-        _ => "Pause",
+    let (action_label, action) = match app.state {
+        SyncState::Blocked => ("Sign in", Message::SignIn),
+        SyncState::Paused => ("Resume", Message::TogglePause),
+        _ => ("Pause", Message::TogglePause),
     };
     let footer = row![
         button(text("Open folder").size(theme::TEXT_BODY)),
         button(text("View online").size(theme::TEXT_BODY)),
         space::horizontal(),
-        button(text(pause_label).size(theme::TEXT_BODY)).on_press(Message::TogglePause),
+        button(text(action_label).size(theme::TEXT_BODY)).on_press(action),
     ]
     .spacing(theme::GAP);
 

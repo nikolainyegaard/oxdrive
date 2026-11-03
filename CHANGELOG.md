@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Flyout closes on a click anywhere else; the Hide button is gone
 - Flyout centres on the tray icon when the host reports the click position
 - SIGTERM, SIGINT and SIGHUP stop the client before oxdrive exits
+- Sign in from the flyout when the token has expired; the client opens the browser and syncing resumes once the sign-in lands
 - Recent activity list with uploads and deletes
 - Quit stops the client cleanly
 

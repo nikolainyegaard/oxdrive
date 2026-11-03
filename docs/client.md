@@ -1,12 +1,13 @@
 # The onedrive client
 
-oxdrive drives `onedrive` (abraunegg), minimum v2.5.11, as a child process. The client has no JSON output and no IPC; everything is parsed from its stdout. Nothing here is implemented yet; this page records what is known so the parser is written against facts.
+oxdrive drives `onedrive` (abraunegg), minimum v2.5.11, as a child process. The client has no JSON output and no IPC; everything is parsed from its stdout. This page records what is known so the parser is written against facts.
 
 ## Invocation
 
 | Purpose | Command |
 |---------|---------|
-| Run and keep syncing | `onedrive --confdir <dir> --monitor` |
+| Run and keep syncing | `onedrive --confdir <dir> --monitor --disable-notifications` |
+| Sign in again, then keep syncing | `onedrive --confdir <dir> --monitor --reauth --disable-notifications` |
 | One-off sync | `onedrive --confdir <dir> --synchronize` |
 | Sign in without a terminal | `onedrive --confdir <dir> --auth-files <url-file>:<response-file>` |
 | Sign in with a pasted URL | `onedrive --confdir <dir> --auth-response <url>` |
@@ -18,7 +19,9 @@ oxdrive drives `onedrive` (abraunegg), minimum v2.5.11, as a child process. The 
 
 ## Sign in
 
-v2.5.11 redirects to a loopback listener the client opens itself (`http://127.0.0.1:<port>/?code=...`), observed on 2026-11-02 with a plain `onedrive --confdir <dir>` run. The browser lands on that URL and the client takes the code; nothing has to be pasted. `--auth-files` and `--auth-response` still exist for the case where the browser runs on another machine. The flyout therefore opens the URL and waits; a paste box is the fallback, shown only if the client keeps waiting.
+v2.5.11 redirects to a loopback listener the client opens itself (`http://127.0.0.1:<port>/?code=...`), observed on 2026-11-02 with a plain `onedrive --confdir <dir>` run. The client opens the browser itself (`$BROWSER`, else xdg-open) and prints `Opening the Microsoft authorisation URL in your default browser ...` followed by `Waiting for the Microsoft authorisation response on http://127.0.0.1:<port>/`; it never prints the URL, even when the browser command fails. The browser lands on the loopback URL, the client takes the code and continues into monitor mode. So the Sign in button only reruns the client with `--reauth`; oxdrive opens nothing and parses no URL. `--auth-files` and `--auth-response` still exist for the case where the browser runs on another machine; not used.
+
+If the client that opened the tab is gone by the time the browser redirects, the browser shows "Unable to connect" to 127.0.0.1. Press Sign in again for a fresh tab.
 
 The MFA-expired case is a real one (fixture `monitor-auth-expired.txt`): the client prints an `AADSTS50078` line and then `ERROR: You will need to issue a --reauth and re-authorise this client to obtain a fresh auth token.` and exits. That is the Blocked state.
 
@@ -33,6 +36,7 @@ Captured from onedrive v2.5.11 on 2026-11-02, business account, Plasma session. 
 | `display-config.txt` | Every `Config option '<key>' = <value>` line |
 | `monitor-upload-delete.txt` | Start-up block, initial sync, a new local file uploaded, the same file deleted, a WebSocket signal, clean shutdown |
 | `monitor-auth-expired.txt` | Start-up block ending in the AADSTS50078 error and the `--reauth` instruction |
+| `monitor-sign-in.txt` | `--reauth` run up to the browser hand-off, captured 2026-11-03 with an empty config dir |
 
 ## Lines that drive state
 
@@ -48,6 +52,7 @@ From the fixtures above. Each row becomes a parser test.
 | `Remaining Free Space:  <n> GB (<bytes> bytes)` | Quota, printed at start-up |
 | `Account Type:          <business|personal>` | Account line |
 | `ERROR: You will need to issue a --reauth ...` | Blocked |
+| `Opening the Microsoft authorisation URL in your default browser ...` | Blocked, with "Finish signing in in your browser" |
 | `Received termination signal, attempting to cleanly shutdown application` | Disabled follows when the process exits |
 | `INFO: A new onedrive client version is available.` | Ignore |
 

@@ -45,3 +45,7 @@ In monitor mode the client notifies on every start and stop of a sync through li
 ## 2026-11-03: the click position is global, the layer-shell margin is per output
 
 Plasma passes the click position to `Activate` in global compositor pixels (observed 4735,1413 on a 5120 wide panel output). A layer-shell margin counts from the edge of the output the surface lands on. iced_layershell does not expose output geometry, so the flyout is centred on the icon only when the panel's output is at x = 0, which it is on this machine. A margin past the output's right edge would push the surface off screen; nothing clamps it yet.
+
+## 2026-11-03: the client opens the browser, not oxdrive
+
+The plan was `--auth-files` plus xdg-open. In v2.5.11 a `--reauth` run opens the browser itself and takes the code on a loopback port, and it never prints the URL, so there is nothing for oxdrive to open or parse. Sign in is a respawn with `--reauth`. If that client is stopped before the browser redirects, the redirect fails with "Unable to connect" and the user presses Sign in again.
