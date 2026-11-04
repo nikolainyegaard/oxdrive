@@ -91,10 +91,53 @@ fn slot_for(state: SyncState) -> String {
     }
 }
 
-/// Copies one file per slot into the icons directory and refreshes the installed app icon.
+/// An icon file as SVG bytes: an SVG as is, a PNG wrapped in an SVG of its own size, so every
+/// consumer (tray, views, icon theme) keeps reading one format. `None` for anything else.
+#[must_use]
+pub fn read(path: &Path) -> Option<Vec<u8>> {
+    let data = std::fs::read(path).ok()?;
+    if data.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return wrap_png(&data);
+    }
+    data.windows(4).any(|w| w == b"<svg").then_some(data)
+}
+
+fn wrap_png(png: &[u8]) -> Option<Vec<u8>> {
+    let dim = |at: usize| {
+        png.get(at..at + 4)
+            .and_then(|b| <[u8; 4]>::try_from(b).ok())
+            .map(u32::from_be_bytes)
+    };
+    let (w, h) = (dim(16)?, dim(20)?);
+    Some(format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 {w} {h}\"><image width=\"{w}\" height=\"{h}\" xlink:href=\"data:image/png;base64,{}\"/></svg>",
+        base64(png)
+    )
+    .into_bytes())
+}
+
+/// Standard base64 with padding; the only encoder we need, so no crate.
+fn base64(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let at = |i: u32| char::from(TABLE.get((i & 63) as usize).copied().unwrap_or(b'='));
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &b)| n | u32::from(b) << (16 - 8 * i));
+        out.push(at(n >> 18));
+        out.push(at(n >> 12));
+        out.push(if chunk.len() > 1 { at(n >> 6) } else { '=' });
+        out.push(if chunk.len() > 2 { at(n) } else { '=' });
+    }
+    out
+}
+
+/// Writes one file per slot into the icons directory and refreshes the installed app icon.
 ///
 /// # Errors
-/// A file could not be read or written.
+/// A file could not be read, is neither SVG nor PNG, or could not be written.
 pub fn replace_set(picks: &[(&str, &Path)]) -> oxdrive_core::Result<()> {
     use std::os::unix::fs::DirBuilderExt as _;
     let dir = config_dir().ok_or("no home directory")?.join("icons");
@@ -104,8 +147,9 @@ pub fn replace_set(picks: &[(&str, &Path)]) -> oxdrive_core::Result<()> {
         .create(&dir)
         .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     for (slot, from) in picks {
-        std::fs::copy(from, dir.join(format!("{slot}.svg")))
-            .map_err(|e| format!("could not copy {}: {e}", from.display()))?;
+        let svg = read(from).ok_or_else(|| format!("{} is not an SVG or PNG", from.display()))?;
+        std::fs::write(dir.join(format!("{slot}.svg")), svg)
+            .map_err(|e| format!("could not write {slot}.svg: {e}"))?;
     }
     if installed() {
         install();
@@ -228,4 +272,29 @@ fn icon_changed() {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_matches_the_standard() {
+        assert_eq!(base64(b""), "");
+        assert_eq!(base64(b"f"), "Zg==");
+        assert_eq!(base64(b"fo"), "Zm8=");
+        assert_eq!(base64(b"foo"), "Zm9v");
+        assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+    }
+
+    #[test]
+    fn a_png_becomes_an_svg_of_its_size() {
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend_from_slice(&64u32.to_be_bytes());
+        png.extend_from_slice(&48u32.to_be_bytes());
+        let svg = String::from_utf8(wrap_png(&png).unwrap_or_default()).unwrap_or_default();
+        assert!(svg.starts_with("<svg"), "{svg}");
+        assert!(svg.contains("viewBox=\"0 0 64 48\""), "{svg}");
+        assert!(svg.contains("data:image/png;base64,iVBORw0KGgo"), "{svg}");
+    }
 }

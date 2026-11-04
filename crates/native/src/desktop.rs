@@ -24,7 +24,23 @@ pub fn notify(summary: &str, body: &str) {
         .spawn();
 }
 
-/// Asks the user for an SVG file through the desktop's dialog, `kdialog` then `zenity`. Blocks
+/// A yes or no question through the desktop's dialog, `kdialog` then `zenity`. Blocks; `false`
+/// when declined, closed or neither tool is installed.
+#[must_use]
+pub fn confirm(question: &str) -> bool {
+    let kdialog = Command::new("kdialog")
+        .args(["--title", "OneDrive", "--yesno", question])
+        .status();
+    match kdialog {
+        Ok(status) => status.success(),
+        Err(_) => Command::new("zenity")
+            .args(["--question", "--title=OneDrive", "--text", question])
+            .status()
+            .is_ok_and(|s| s.success()),
+    }
+}
+
+/// Asks the user for an SVG or PNG file through the desktop's dialog, `kdialog` then `zenity`. Blocks
 /// until the dialog closes; `None` when it was cancelled or neither tool is installed.
 #[must_use]
 pub fn pick_svg() -> Option<PathBuf> {
@@ -32,7 +48,7 @@ pub fn pick_svg() -> Option<PathBuf> {
     let kdialog = Command::new("kdialog")
         .args(["--title", "Choose an icon", "--getopenfilename"])
         .arg(&home)
-        .arg("image/svg+xml")
+        .arg("image/svg+xml image/png")
         .output();
     let out = match kdialog {
         Ok(out) => out,
@@ -40,7 +56,7 @@ pub fn pick_svg() -> Option<PathBuf> {
             .args([
                 "--file-selection",
                 "--title=Choose an icon",
-                "--file-filter=SVG icons | *.svg",
+                "--file-filter=Icons | *.svg *.png",
             ])
             .output()
             .ok()?,

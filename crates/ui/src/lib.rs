@@ -70,7 +70,9 @@ pub enum Message {
     PickIcon(usize),
     IconPicked(usize, Option<PathBuf>),
     SaveIcons,
+    /// Asks first; `ResetConfirmed` carries the answer.
     ResetIcons,
+    ResetConfirmed(bool),
     SetThemeIcon(bool),
 }
 
@@ -419,13 +421,19 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             }
             Task::none()
         }
-        Message::ResetIcons => {
+        Message::ResetIcons => Task::perform(
+            futures::future::lazy(|_| {
+                desktop::confirm("Remove the custom icons and use the built-in ones?")
+            }),
+            Message::ResetConfirmed,
+        ),
+        Message::ResetConfirmed(false) => Task::none(),
+        Message::ResetConfirmed(true) => {
             oxdrive_native::icons::clear_set();
             app.icon_picks.iter_mut().for_each(|p| *p = None);
             if let Some(tray) = &app.tray {
                 tray.reload_icons();
             }
-            app.notice = Some("Built-in icons are back.".into());
             Task::none()
         }
         Message::TitleFound(Ok(title)) => {

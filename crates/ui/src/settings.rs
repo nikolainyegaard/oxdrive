@@ -254,18 +254,18 @@ fn notifications(app: &App) -> Element<'_, Message> {
     .into()
 }
 
-/// Two rows of slots: the icons in use above, the files picked for the new set below. Save
-/// copies the files in; a set is all seven or nothing.
+/// Two rows of slots: the icons in use above on the window colour, the files picked for the new
+/// set below on buttons. Save copies the files in; a set is all seven or nothing.
 fn icons(app: &App) -> Element<'_, Message> {
-    use oxdrive_native::icons::{SLOTS, slot_svg};
+    use oxdrive_native::icons::{SLOTS, read, slot_svg};
     const BOX: f32 = 64.0;
-    fn frame<'a>(content: Element<'a, Message>) -> container::Container<'a, Message> {
+    fn current(content: Element<'_, Message>) -> container::Container<'_, Message> {
         container(content)
             .width(BOX)
             .height(BOX)
             .center(BOX)
             .style(|_| container::Style {
-                background: Some(theme::BUTTON.into()),
+                background: Some(theme::BACKGROUND.into()),
                 border: Border {
                     radius: theme::CARD_RADIUS.into(),
                     ..Border::default()
@@ -274,23 +274,30 @@ fn icons(app: &App) -> Element<'_, Message> {
             })
     }
     let slot = |i: usize, (name, label): (&'static str, &'static str)| {
-        let current = picture(Handle::from_memory(slot_svg(name)), theme::ICON_FILE);
-        let picked: Element<'_, Message> = match app.icon_picks.get(i).and_then(|p| p.as_ref()) {
-            Some(path) => picture(Handle::from_path(path), theme::ICON_FILE),
+        let in_use = picture(Handle::from_memory(slot_svg(name)), theme::ICON_FILE);
+        let picked: Element<'_, Message> = match app
+            .icon_picks
+            .get(i)
+            .and_then(|p| p.as_ref())
+            .and_then(|p| read(p))
+        {
+            Some(svg) => picture(Handle::from_memory(svg), theme::ICON_FILE),
             None => text("+")
                 .size(theme::TEXT_HEADING)
                 .color(theme::TEXT_SECONDARY)
                 .into(),
         };
         column![
-            frame(current),
+            current(in_use),
             text(label)
                 .size(theme::TEXT_SMALL)
                 .color(theme::TEXT_SECONDARY),
             icon(Icon::ArrowDown, theme::ICON, theme::TEXT_SECONDARY),
-            button(frame(picked))
-                .style(button::text)
+            button(container(picked).center(BOX))
+                .style(grey)
                 .padding(0)
+                .width(BOX)
+                .height(BOX)
                 .on_press(Message::PickIcon(i)),
         ]
         .spacing(4)
@@ -308,14 +315,14 @@ fn icons(app: &App) -> Element<'_, Message> {
                     .padding([theme::GAP, theme::PADDING])
                     .on_press(Message::SaveIcons),
                 button(text("Use built-in icons").size(theme::TEXT_BODY))
-                    .style(button::text)
+                    .style(grey)
                     .padding([theme::GAP, theme::PADDING])
                     .on_press(Message::ResetIcons),
             ]
             .spacing(theme::GAP),
         ]
         .spacing(theme::PADDING))),
-        text("The first icon is the app: launcher, window header, flyout header and the tray when everything is synced. The rest are the tray in each other state. Click a box to choose an SVG file.")
+        text("The first icon is the app: launcher, window header, flyout header and the tray when everything is synced. The rest are the tray in each other state. Click a box to choose an SVG or PNG file.")
             .size(theme::TEXT_SMALL)
             .color(theme::TEXT_SECONDARY),
         section(

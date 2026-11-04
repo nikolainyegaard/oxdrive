@@ -18,7 +18,7 @@ iced_layershell = "0.19"
 ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
 futures = "0.3"
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }
-resvg = { version = "0.45", default-features = false }
+resvg = { version = "0.45", default-features = false, features = ["raster-images"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
