@@ -153,10 +153,7 @@ pub fn spawn(events: UnboundedSender<TrayEvent>) -> oxdrive_core::Result<TrayHan
     Tray {
         state: SyncState::Idle,
         events,
-        pixmaps: {
-            crate::icons::install();
-            pixmaps()
-        },
+        pixmaps: pixmaps(),
     }
     .spawn()
     .map(TrayHandle)

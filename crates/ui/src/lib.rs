@@ -71,6 +71,7 @@ pub enum Message {
     IconPicked(usize, Option<PathBuf>),
     SaveIcons,
     ResetIcons,
+    SetThemeIcon(bool),
 }
 
 pub struct App {
@@ -352,6 +353,16 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             }
             Task::none()
         }
+        Message::SetThemeIcon(on) => {
+            app.settings.theme_icon = on;
+            app.save_settings();
+            if on {
+                oxdrive_native::icons::install();
+            } else {
+                oxdrive_native::icons::uninstall();
+            }
+            Task::none()
+        }
         Message::SetNotifyPaused(on) => {
             app.settings.notify_when_paused = on;
             app.save_settings();
@@ -497,6 +508,9 @@ pub fn run() -> oxdrive_core::Result<()> {
     tray::quit_on_signal(tx.clone())?;
     let tray = Mutex::new(Some(tray::spawn(tx)?));
     let settings = oxdrive_native::settings::load();
+    if settings.theme_icon {
+        oxdrive_native::icons::install();
+    }
     let profiles = client::profiles();
     let profile = settings
         .profile

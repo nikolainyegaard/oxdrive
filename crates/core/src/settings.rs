@@ -5,10 +5,13 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     /// Desktop notification when syncing is paused.
     pub notify_when_paused: bool,
+    /// Copy the app icon into the user's icon theme, which is where the desktop takes the window
+    /// header, taskbar and launcher icons from. On until turned off.
+    pub theme_icon: bool,
     /// The profile that runs; the first one when unset or unknown.
     pub profile: Option<String>,
     /// Per profile name: what the user typed and what Microsoft answered.
@@ -21,6 +24,17 @@ pub struct Account {
     pub email: String,
     /// `OneDrive - <tenant>` from `crate::realm::title`, kept so startup needs no network.
     pub title: Option<String>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            notify_when_paused: false,
+            theme_icon: true,
+            profile: None,
+            accounts: BTreeMap::new(),
+        }
+    }
 }
 
 impl Settings {
@@ -41,6 +55,7 @@ impl Settings {
             let (key, value) = (key.trim(), value.trim());
             match (&section, key) {
                 (None, "notify_when_paused") => settings.notify_when_paused = value == "true",
+                (None, "theme_icon") => settings.theme_icon = value != "false",
                 (None, "profile") if !value.is_empty() => settings.profile = Some(value.into()),
                 (Some(name), "email") => {
                     settings.accounts.entry(name.clone()).or_default().email = value.into();
@@ -57,7 +72,10 @@ impl Settings {
     /// The file's text. `parse(render())` gives the same settings back.
     #[must_use]
     pub fn render(&self) -> String {
-        let mut out = format!("notify_when_paused = {}\n", self.notify_when_paused);
+        let mut out = format!(
+            "notify_when_paused = {}\ntheme_icon = {}\n",
+            self.notify_when_paused, self.theme_icon
+        );
         if let Some(profile) = &self.profile {
             let _ = writeln!(out, "profile = {profile}");
         }
@@ -88,6 +106,7 @@ mod tests {
     fn round_trip() {
         let mut settings = Settings {
             notify_when_paused: true,
+            theme_icon: false,
             profile: Some("Work".into()),
             accounts: BTreeMap::new(),
         };
@@ -108,6 +127,7 @@ mod tests {
     #[test]
     fn empty_and_garbage_give_defaults() {
         assert_eq!(Settings::parse(""), Settings::default());
+        assert!(Settings::parse("theme_icon = nonsense").theme_icon);
         assert_eq!(
             Settings::parse("profile =\nnonsense\n= x"),
             Settings::default()

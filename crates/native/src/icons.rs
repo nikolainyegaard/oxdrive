@@ -107,7 +107,9 @@ pub fn replace_set(picks: &[(&str, &Path)]) -> oxdrive_core::Result<()> {
         std::fs::copy(from, dir.join(format!("{slot}.svg")))
             .map_err(|e| format!("could not copy {}: {e}", from.display()))?;
     }
-    install();
+    if installed() {
+        install();
+    }
     Ok(())
 }
 
@@ -118,7 +120,9 @@ pub fn clear_set() {
             let _ = std::fs::remove_file(path);
         }
     }
-    install();
+    if installed() {
+        install();
+    }
 }
 
 /// Writes the file only when its content differs, so an unchanged start touches nothing.
@@ -169,22 +173,59 @@ fn rasterise(tree: &resvg::usvg::Tree, size: u32) -> Option<ksni::Icon> {
     })
 }
 
-/// Installs the app icon and desktop entry under the data directory, which is how the desktop
-/// finds the icon for windows with our app id. Best effort; nothing to show when it fails.
+fn theme_files() -> Option<(PathBuf, PathBuf)> {
+    let data = data_dir()?;
+    Some((
+        data.join(format!("icons/hicolor/scalable/apps/{APP_ID}.svg")),
+        data.join(format!("applications/{APP_ID}.desktop")),
+    ))
+}
+
+/// Whether the app icon sits in the user's icon theme.
+#[must_use]
+pub fn installed() -> bool {
+    theme_files().is_some_and(|(svg, _)| svg.is_file())
+}
+
+/// Copies the app icon and a desktop entry into the user's icon theme and application list. The
+/// desktop resolves the window header, taskbar and launcher icons by app id from there, never
+/// from the running window, so without this they show a generic icon. Best effort.
 pub fn install() {
-    let Some(data) = data_dir() else { return };
-    let _ = put(
-        &data.join(format!("icons/hicolor/scalable/apps/{APP_ID}.svg")),
-        &app_svg(),
-    );
+    let Some((svg, desktop)) = theme_files() else {
+        return;
+    };
+    let _ = put(&svg, &app_svg());
     if let Ok(exe) = std::env::current_exe() {
         let entry = format!(
             "[Desktop Entry]\nType=Application\nName=OneDrive\nComment=Keeps your OneDrive in sync\nExec={}\nIcon={APP_ID}\nTerminal=false\nCategories=Network;\n",
             exe.display()
         );
-        let _ = put(
-            &data.join(format!("applications/{APP_ID}.desktop")),
-            entry.as_bytes(),
-        );
+        let _ = put(&desktop, entry.as_bytes());
     }
+    icon_changed();
+}
+
+/// Removes what `install` wrote.
+pub fn uninstall() {
+    let Some((svg, desktop)) = theme_files() else {
+        return;
+    };
+    let _ = std::fs::remove_file(svg);
+    let _ = std::fs::remove_file(desktop);
+    icon_changed();
+}
+
+/// Tells KDE's icon loader to drop its cache, so the new icon shows without a new login.
+fn icon_changed() {
+    let _ = std::process::Command::new("dbus-send")
+        .args([
+            "--session",
+            "--type=signal",
+            "/KIconLoader",
+            "org.kde.KIconLoader.iconChanged",
+            "int32:0",
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
 }

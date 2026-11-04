@@ -6,6 +6,7 @@ Implemented so far: `native::client::profiles` reads OneDriveGUI's `~/.config/on
 
 ```
 notify_when_paused = false
+theme_icon = true
 profile = Nikolai
 
 [Nikolai]
@@ -13,7 +14,7 @@ email = user@example.com
 title = OneDrive - Example AS
 ```
 
-Top-level keys are the preferences; one section per profile holds the sign-in address and the title Microsoft answered, so startup needs no network. Autostart is not a key: `~/.config/autostart/oxdrive.desktop` exists or it does not (`native::autostart`). The rest is intent:
+Top-level keys are the preferences (`theme_icon`, on by default, keeps a copy of the app icon in `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is where the desktop takes the window header, taskbar and launcher icons from; off removes both); one section per profile holds the sign-in address and the title Microsoft answered, so startup needs no network. Autostart is not a key: `~/.config/autostart/oxdrive.desktop` exists or it does not (`native::autostart`). The rest is intent:
 
 - XDG base directories under the app name: `~/.config/oxdrive/` for settings and the profile list, `~/.local/state/oxdrive/` for logs and the recent activity list (`<profile>.recent`, one row per line, newest first, ten rows). Directories created with owner-only permissions, files written through a temp file and a rename.
 - A profile is a name, the path of a client config directory, and the sign-in address, which gives the flyout its `OneDrive - <tenant>` title through `core::realm` (see client.md). The first import reads OneDriveGUI's `~/.config/onedrive-gui/profiles` so an existing setup carries over.

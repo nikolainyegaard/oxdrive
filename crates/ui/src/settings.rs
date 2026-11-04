@@ -301,9 +301,6 @@ fn icons(app: &App) -> Element<'_, Message> {
     let slots = row(SLOTS.into_iter().enumerate().map(|(i, s)| slot(i, s))).spacing(theme::GAP);
     column![
         section("Icon set", card(column![
-            text("The first icon is the app: launcher, window header, flyout header and the tray when everything is synced. The rest are the tray in each other state. Click a box below to choose an SVG file; Save copies the files into the icon storage, so the originals can move.")
-                .size(theme::TEXT_BODY)
-                .color(theme::TEXT_SECONDARY),
             slots,
             row![
                 button(text("Save").size(theme::TEXT_BODY))
@@ -318,7 +315,19 @@ fn icons(app: &App) -> Element<'_, Message> {
             .spacing(theme::GAP),
         ]
         .spacing(theme::PADDING))),
+        text("The first icon is the app: launcher, window header, flyout header and the tray when everything is synced. The rest are the tray in each other state. Click a box to choose an SVG file.")
+            .size(theme::TEXT_SMALL)
+            .color(theme::TEXT_SECONDARY),
+        section(
+            "Desktop",
+            card(toggle_row(
+                "Use the app icon for the window header, taskbar and launcher",
+                app.settings.theme_icon,
+                Message::SetThemeIcon,
+            )),
+        ),
     ]
+    .spacing(theme::PADDING)
     .into()
 }
 
