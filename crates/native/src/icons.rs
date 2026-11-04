@@ -1,9 +1,13 @@
 //! Icon files on disk. Built-in SVGs are compiled in; a file of the same name under
 //! `~/.config/oxdrive/icons/` replaces one, so the whole set can be swapped (docs/config.md).
 //!
+//! One app icon serves everywhere: the launcher and window header through a hicolor copy, the
+//! flyout header through `app_svg`, and the tray, where each state is that icon with a badge
+//! drawn over it (none when idle, dimmed when disabled). A custom `tray-<state>.svg` replaces
+//! the whole composed icon for that state.
+//!
 //! The tray gets pixmaps over D-Bus, rasterised here with resvg: Plasma ignored both layouts of
-//! `IconThemePath` (probed 2026-11-04), and every host honours `IconPixmap`. The app icon and a
-//! desktop entry go where the desktop finds them by app id.
+//! `IconThemePath` (probed 2026-11-04), and every host honours `IconPixmap`.
 
 use std::path::{Path, PathBuf};
 
@@ -40,20 +44,26 @@ fn bytes(name: &str, builtin: &'static [u8]) -> Vec<u8> {
         .unwrap_or_else(|| builtin.to_vec())
 }
 
-fn tray_builtin(state: SyncState) -> &'static [u8] {
+/// The app icon, the user's `app.svg` or ours.
+#[must_use]
+pub fn app_svg() -> Vec<u8> {
+    bytes("app", include_bytes!("../../../assets/app.svg"))
+}
+
+/// The badge drawn over the app icon for a state; idle and disabled have none.
+fn badge(state: SyncState) -> Option<&'static [u8]> {
     macro_rules! asset {
         ($name:literal) => {
             include_bytes!(concat!("../../../assets/tray/", $name, ".svg"))
         };
     }
     match state {
-        SyncState::Idle => asset!("idle"),
-        SyncState::Syncing => asset!("syncing"),
-        SyncState::Paused => asset!("paused"),
-        SyncState::Warning => asset!("warning"),
-        SyncState::Error => asset!("error"),
-        SyncState::Blocked => asset!("blocked"),
-        SyncState::Disabled => asset!("disabled"),
+        SyncState::Idle | SyncState::Disabled => None,
+        SyncState::Syncing => Some(asset!("syncing")),
+        SyncState::Paused => Some(asset!("paused")),
+        SyncState::Warning => Some(asset!("warning")),
+        SyncState::Error => Some(asset!("error")),
+        SyncState::Blocked => Some(asset!("blocked")),
     }
 }
 
@@ -69,33 +79,49 @@ fn put(path: &Path, content: &[u8]) -> std::io::Result<()> {
 }
 
 /// The tray pixmaps for one state, 22 and 44 px, ARGB32 in network byte order as the
-/// StatusNotifierItem spec wants them. Empty when the SVG does not parse.
+/// StatusNotifierItem spec wants them. Empty when an SVG does not parse.
 #[must_use]
 pub fn tray_pixmaps(state: SyncState) -> Vec<ksni::Icon> {
-    let svg = bytes(&format!("tray-{}", state.slug()), tray_builtin(state));
-    let Ok(tree) = resvg::usvg::Tree::from_data(&svg, &resvg::usvg::Options::default()) else {
-        return Vec::new();
+    let parse = |svg: &[u8]| resvg::usvg::Tree::from_data(svg, &resvg::usvg::Options::default());
+    let layers: Vec<resvg::usvg::Tree> = match custom(&format!("tray-{}", state.slug())) {
+        Some(path) => std::fs::read(path)
+            .ok()
+            .and_then(|svg| parse(&svg).ok())
+            .into_iter()
+            .collect(),
+        None => [Some(app_svg()), badge(state).map(<[u8]>::to_vec)]
+            .into_iter()
+            .flatten()
+            .filter_map(|svg| parse(&svg).ok())
+            .collect(),
     };
+    if layers.is_empty() {
+        return Vec::new();
+    }
+    let dim = if state == SyncState::Disabled { 2 } else { 1 };
     [22, 44]
         .into_iter()
-        .filter_map(|size| rasterise(&tree, size))
+        .filter_map(|size| rasterise(&layers, size, dim))
         .collect()
 }
 
-fn rasterise(tree: &resvg::usvg::Tree, size: u32) -> Option<ksni::Icon> {
+/// Draws the layers in order at `size` px, alpha divided by `dim`.
+fn rasterise(layers: &[resvg::usvg::Tree], size: u32, dim: u8) -> Option<ksni::Icon> {
     let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)?;
-    let scale = size as f32 / tree.size().width().max(tree.size().height());
-    resvg::render(
-        tree,
-        resvg::tiny_skia::Transform::from_scale(scale, scale),
-        &mut pixmap.as_mut(),
-    );
+    for tree in layers {
+        let scale = size as f32 / tree.size().width().max(tree.size().height());
+        resvg::render(
+            tree,
+            resvg::tiny_skia::Transform::from_scale(scale, scale),
+            &mut pixmap.as_mut(),
+        );
+    }
     let data = pixmap
         .pixels()
         .iter()
         .flat_map(|p| {
             let c = p.demultiply();
-            [c.alpha(), c.red(), c.green(), c.blue()]
+            [c.alpha() / dim, c.red(), c.green(), c.blue()]
         })
         .collect();
     Some(ksni::Icon {
@@ -109,10 +135,9 @@ fn rasterise(tree: &resvg::usvg::Tree, size: u32) -> Option<ksni::Icon> {
 /// finds the icon for windows with our app id. Best effort; nothing to show when it fails.
 pub fn install() {
     let Some(data) = data_dir() else { return };
-    let app = bytes("app", include_bytes!("../../../assets/app.svg"));
     let _ = put(
         &data.join(format!("icons/hicolor/scalable/apps/{APP_ID}.svg")),
-        &app,
+        &app_svg(),
     );
     if let Ok(exe) = std::env::current_exe() {
         let entry = format!(

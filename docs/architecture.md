@@ -14,7 +14,7 @@ oxdrive/
 │   ├── src/profiles.rs     # OneDriveGUI profiles file: name and config dir per account
 │   ├── src/realm.rs        # home realm discovery reply to the flyout title; see client.md
 │   ├── src/settings.rs     # our settings file: preferences and per-profile account facts
-│   ├── src/status.rs       # SyncState: the seven tray states and their copy
+│   ├── src/status.rs       # SyncState: the seven tray states and their copy; Activity rows
 │   └── tests/fixtures/     # real client output, scrubbed; see client.md
 ├── crates/native/          # everything that touches the OS
 │   ├── src/autostart.rs    # the XDG autostart desktop file

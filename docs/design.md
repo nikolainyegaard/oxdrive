@@ -41,17 +41,17 @@ All in `crates/ui/src/theme.rs`. Views name a token, never a colour or size.
 | Blocked | Sign in to sync | dialog-password |
 | Disabled | OneDrive isn't running | folder-cloud |
 
-The seven states are the Windows set. Our icons: seven SVGs under `assets/tray/`, a white cloud silhouette on a 22 px grid with a badge at the bottom right per state (green check, blue arrows, grey pause, yellow exclamation, red cross, red lock), the disabled cloud at half opacity with no badge. `assets/app.svg` is the same cloud filled blue: the app icon for the window header, the task bar and the launcher. The Microsoft set is reference only; a user who wants it drops it into the override directory (config.md).
+The seven states are the Windows set. One icon, `assets/app.svg` (a blue cloud on a 22 px grid), is the app icon everywhere: the launcher, the task bar, the window header, the flyout header and the tray. Idle shows it plain, as the Windows client does. The other states draw a badge over it from `assets/tray/`, bottom right (blue arrows, grey pause, yellow exclamation, red cross, red lock); disabled is the plain icon at half opacity. Replacing `app.svg` replaces all of them at once. The Microsoft set is reference only; a user who wants it drops it into the override directory (config.md).
 
 ## Flyout layout
 
-Top to bottom: title row (blue cloud, `OneDrive - <tenant>` or `OneDrive`, gear at the right for Settings), status headline behind its mark (check in green when idle, sync arrows in blue, pause in yellow, warning triangle in yellow, error cross in red, key in red when blocked), recent activity list (or "No recent activity"), spacer, footer bar on the card colour with three equal buttons, icon over label: folder for Open folder, globe for View online, and the action (pause, play for Resume, key for Sign in): Pause, Resume when paused or stopped, Sign in when blocked.
+Top to bottom: title row (the app icon, `OneDrive - <tenant>` or `OneDrive` at TEXT_TITLE, gear at the right for Settings), status headline behind its mark (check in green when idle, sync arrows in blue, pause in yellow, warning triangle in yellow, error cross in red, key in red when blocked), recent activity list (or "No recent activity"), spacer, footer bar on the card colour with three equal buttons, icon over label: folder for Open folder, globe for View online, and the action (pause, play for Resume, key for Sign in): Pause, Resume when paused or stopped, Sign in when blocked.
 
 An activity row is the file name, then `Uploaded to <folder>` or `Deleted from <folder>` with the folder in the accent colour (`OneDrive` for the sync root), then a relative time: `just now`, `14 seconds ago`, `18 hours ago`. The time is computed when the flyout is drawn, so it only moves on the next event.
 
 ## In-app icons
 
-Fifteen SVGs under `assets/icons/`, drawn by us: 20 x 20 viewBox, 1.5 px white strokes, round caps, no fill. They are compiled in (`ui::icons`) and recoloured per use through iced's svg style, so one file serves every colour. A file of the same name under `~/.config/oxdrive/icons/` replaces the built-in one at the next view (config.md).
+Fourteen SVGs under `assets/icons/`, drawn by us: 20 x 20 viewBox, 1.5 px white strokes, round caps, no fill. They are compiled in (`ui::icons`) and recoloured per use through iced's svg style, so one file serves every colour. A file of the same name under `~/.config/oxdrive/icons/` replaces the built-in one at the next view (config.md).
 
 | Name | Used for |
 |------|----------|
@@ -60,7 +60,7 @@ Fifteen SVGs under `assets/icons/`, drawn by us: 20 x 20 viewBox, 1.5 px white s
 | file | Activity row |
 | folder, globe, play | Footer buttons |
 
-The tray icons travel as pixmaps: `native::icons::tray_pixmaps` rasterises each state's SVG with resvg at 22 and 44 px into ARGB32 and the tray serves them as `IconPixmap`. `IconThemePath` was tried first, flat and in `hicolor/` layout; Plasma 6 showed the unknown-icon placeholder for both (2026-11-04), and pixmaps are what every host honours. When an SVG does not parse the tray falls back to theme icon names (`SyncState::icon_name`). The app icon goes to `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is how Plasma finds the icon for windows with the app id `oxdrive`.
+The tray icons travel as pixmaps: `native::icons::tray_pixmaps` rasterises the app icon and the state's badge on top of it with resvg at 22 and 44 px into ARGB32 and the tray serves them as `IconPixmap`. A custom `tray-<state>.svg` is rendered alone instead. `IconThemePath` was tried first, flat and in `hicolor/` layout; Plasma 6 showed the unknown-icon placeholder for both (2026-11-04), and pixmaps are what every host honours. When an SVG does not parse the tray falls back to theme icon names (`SyncState::icon_name`). The app icon goes to `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is how Plasma finds the icon for windows with the app id `oxdrive`.
 
 ## Settings window
 

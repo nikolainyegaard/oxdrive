@@ -3,16 +3,16 @@
 use iced::widget::{button, column, container, row, scrollable, space, text};
 use iced::{Alignment, Element, Length};
 
-use oxdrive_core::status::{SyncState, ago};
+use oxdrive_core::status::{Activity, SyncState, ago};
 
-use crate::icons::{Icon, icon};
+use crate::icons::{self, Icon, icon};
 use crate::theme;
-use crate::{Activity, App, Message};
+use crate::{App, Message, now};
 
 pub fn view(app: &App) -> Element<'_, Message> {
     let header = column![
         row![
-            icon(Icon::Cloud, theme::ICON_LARGE, theme::ACCENT),
+            icons::app(theme::ICON_LARGE),
             text(&app.title)
                 .size(theme::TEXT_TITLE)
                 .font(theme::SEMIBOLD),
@@ -89,7 +89,7 @@ fn activity(item: &Activity) -> Element<'_, Message> {
                 .color(theme::ACCENT),
         ]
         .spacing(4),
-        text(ago(item.at.elapsed().as_secs()))
+        text(ago(now().saturating_sub(item.at)))
             .size(theme::TEXT_SMALL)
             .color(theme::TEXT_SECONDARY),
     ]
@@ -111,6 +111,7 @@ fn footer_button(glyph: Icon, label: &str, message: Option<Message>) -> Element<
             text(label).size(theme::TEXT_BODY)
         ]
         .spacing(theme::GAP)
+        .width(Length::Fill)
         .align_x(Alignment::Center),
     )
     .style(button::text)

@@ -6,7 +6,6 @@ use iced::{Color, Element};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Icon {
-    Cloud,
     Gear,
     Check,
     Sync,
@@ -27,7 +26,6 @@ impl Icon {
     /// The file stem under `assets/icons/`, and the override name.
     pub fn name(self) -> &'static str {
         match self {
-            Self::Cloud => "cloud",
             Self::Gear => "gear",
             Self::Check => "check",
             Self::Sync => "sync",
@@ -52,7 +50,6 @@ impl Icon {
             };
         }
         match self {
-            Self::Cloud => asset!("cloud"),
             Self::Gear => asset!("gear"),
             Self::Check => asset!("check"),
             Self::Sync => asset!("sync"),
@@ -80,6 +77,14 @@ impl Icon {
     }
 }
 
+/// The app icon in its own colours: the same file the tray and the launcher show.
+pub fn app<'a, Message: 'a>(size: f32) -> Element<'a, Message> {
+    Svg::new(Handle::from_memory(oxdrive_native::icons::app_svg()))
+        .width(size)
+        .height(size)
+        .into()
+}
+
 /// The icon at `size` pixels square, every stroke in `color`.
 pub fn icon<'a, Message: 'a>(icon: Icon, size: f32, color: Color) -> Element<'a, Message> {
     Svg::new(icon.handle())
@@ -96,7 +101,6 @@ mod tests {
     #[test]
     fn every_icon_is_a_small_svg() {
         for icon in [
-            Icon::Cloud,
             Icon::Gear,
             Icon::Check,
             Icon::Sync,

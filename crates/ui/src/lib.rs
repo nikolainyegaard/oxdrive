@@ -7,7 +7,6 @@ mod settings;
 pub mod theme;
 
 use std::sync::{Mutex, PoisonError};
-use std::time::Instant;
 
 use futures::StreamExt as _;
 use futures::channel::mpsc;
@@ -22,7 +21,7 @@ use iced_layershell::to_layer_message;
 use oxdrive_core::client::{Event, folder_and_name};
 use oxdrive_core::profiles::Profile;
 use oxdrive_core::settings::Settings;
-use oxdrive_core::status::SyncState;
+use oxdrive_core::status::{Activity, SyncState};
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
 use oxdrive_native::{autostart, desktop, popup, realm};
@@ -36,6 +35,13 @@ static CLIENT_RX: Mutex<Option<mpsc::UnboundedReceiver<ClientEvent>>> = Mutex::n
 
 /// Activity rows kept in the flyout.
 const RECENT_MAX: usize = 10;
+
+/// Unix seconds, what `Activity::at` holds.
+pub fn now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
 
 #[to_layer_message(multi)]
 #[derive(Debug, Clone)]
@@ -59,15 +65,6 @@ pub enum Message {
     TitleFound(oxdrive_core::Result<String>),
     SelectProfile(String),
     OpenUrl(&'static str),
-}
-
-/// One row of the flyout's recent activity.
-pub struct Activity {
-    pub name: String,
-    /// `Uploaded to` or `Deleted from`.
-    pub action: &'static str,
-    pub folder: String,
-    pub at: Instant,
 }
 
 pub struct App {
@@ -124,7 +121,7 @@ impl App {
             .map(|a| a.email.clone())
             .unwrap_or_default();
         self.account = profile.name.clone();
-        self.recent.clear();
+        self.recent = oxdrive_native::settings::load_recent(name);
         self.free_space = None;
         self.quota = None;
         self.profile = Some(profile);
@@ -149,10 +146,13 @@ impl App {
                 name: name.to_owned(),
                 action,
                 folder: folder.to_owned(),
-                at: Instant::now(),
+                at: now(),
             },
         );
         self.recent.truncate(RECENT_MAX);
+        if let Some(profile) = &self.profile {
+            oxdrive_native::settings::save_recent(&profile.name, &self.recent);
+        }
     }
 
     /// Starts a client for the current profile; dropping any old handle stops it first.
@@ -482,6 +482,10 @@ pub fn run() -> oxdrive_core::Result<()> {
             (settings.title(&p.name), email)
         },
     );
+    let recent = profile
+        .as_ref()
+        .map(|p| oxdrive_native::settings::load_recent(&p.name))
+        .unwrap_or_default();
     let autostart = autostart::enabled();
     let client_version = client::version().unwrap_or_else(|| "not installed".into());
     let boot = move || App {
@@ -498,7 +502,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         quota: None,
         client_version: client_version.clone(),
         account: account.clone(),
-        recent: Vec::new(),
+        recent: recent.clone(),
         detail: detail.clone(),
         profile: profile.clone(),
         flyout: None,

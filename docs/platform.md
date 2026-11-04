@@ -4,7 +4,7 @@ Linux, Wayland, a desktop with a StatusNotifier host and a compositor that offer
 
 ## Tray
 
-StatusNotifierItem over the session bus through `ksni`. Our own icons reach the host as `IconPixmap`, ARGB32 at 22 and 44 px (design.md); `IconThemePath` did not work on Plasma 6. Plasma shows it natively. GNOME needs the AppIndicator extension, same as every other SNI app. The icon is currently an icon-theme name per state (`SyncState::icon_name`); our own pixmaps come with `assets/`.
+StatusNotifierItem over the session bus through `ksni`. Our own icons reach the host as `IconPixmap`, ARGB32 at 22 and 44 px (design.md); `IconThemePath` did not work on Plasma 6. Plasma shows it natively. GNOME needs the AppIndicator extension, same as every other SNI app. Theme icon names (`SyncState::icon_name`) are the fallback when an SVG does not parse.
 
 Left click calls `Tray::activate` with the click position in global screen pixels, which goes out as `TrayEvent::Activate { x }`. The flyout is anchored bottom-left with a left margin that centres it on x, or bottom-right when x is 0 (a shell-triggered Activate, or no click yet). The last x is kept so the flyout can open on its own after a sign-in lands; opened that way it has no focus, so click-off does not close it until it has been clicked once. The right-click menu is built in `Tray::menu`: pause or resume, and Quit.
 

@@ -8,7 +8,7 @@ pub const FLYOUT_SIZE: (u32, u32) = (360, 520);
 pub const FLYOUT_MARGIN: i32 = 8;
 pub const PADDING: f32 = 16.0;
 pub const GAP: f32 = 8.0;
-pub const TEXT_TITLE: f32 = 20.0;
+pub const TEXT_TITLE: f32 = 16.0;
 pub const TEXT_BODY: f32 = 14.0;
 
 pub const BACKGROUND: Color = Color::from_rgb(0.125, 0.125, 0.125);

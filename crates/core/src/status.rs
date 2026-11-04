@@ -143,3 +143,61 @@ mod tests {
         }
     }
 }
+
+/// One row of the flyout's recent activity. Kept on disk between runs (native::settings), one
+/// row per line: `<unix seconds>\t<action>\t<folder>\t<name>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Activity {
+    pub name: String,
+    /// `Uploaded to` or `Deleted from`.
+    pub action: &'static str,
+    pub folder: String,
+    /// Unix seconds.
+    pub at: u64,
+}
+
+impl Activity {
+    /// Parses one saved line; `None` for anything we did not write.
+    #[must_use]
+    pub fn parse(line: &str) -> Option<Self> {
+        let mut fields = line.splitn(4, '\t');
+        let at = fields.next()?.parse().ok()?;
+        let action = match fields.next()? {
+            "Uploaded to" => "Uploaded to",
+            "Deleted from" => "Deleted from",
+            _ => return None,
+        };
+        Some(Self {
+            folder: fields.next()?.to_owned(),
+            name: fields.next()?.to_owned(),
+            action,
+            at,
+        })
+    }
+
+    #[must_use]
+    pub fn render(&self) -> String {
+        format!(
+            "{}\t{}\t{}\t{}",
+            self.at, self.action, self.folder, self.name
+        )
+    }
+}
+
+#[cfg(test)]
+mod activity_tests {
+    use super::Activity;
+
+    #[test]
+    fn activity_rows_survive_a_round_trip() {
+        let row = Activity {
+            name: "Overtid 2026-10-31.xlsx".into(),
+            action: "Uploaded to",
+            folder: "Microsoft Teams Chat Files".into(),
+            at: 1_762_250_000,
+        };
+        assert_eq!(Activity::parse(&row.render()), Some(row));
+        assert_eq!(Activity::parse("x\tUploaded to\ta\tb"), None);
+        assert_eq!(Activity::parse("1\tRenamed\ta\tb"), None);
+    }
+}
