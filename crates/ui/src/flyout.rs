@@ -1,28 +1,30 @@
 //! The flyout: account header, status line, recent activity, footer actions.
 
 use iced::widget::{button, column, container, row, scrollable, space, text};
-use iced::{Alignment, Border, Element, Length};
+use iced::{Alignment, Element, Length};
 
 use oxdrive_core::status::{SyncState, ago};
 
+use crate::icons::{Icon, icon};
 use crate::theme;
 use crate::{Activity, App, Message};
 
 pub fn view(app: &App) -> Element<'_, Message> {
     let header = column![
         row![
+            icon(Icon::Cloud, theme::ICON_LARGE, theme::ACCENT),
             text(&app.title)
                 .size(theme::TEXT_TITLE)
                 .font(theme::SEMIBOLD),
             space::horizontal(),
-            button(text("Settings").size(theme::TEXT_BODY))
+            button(icon(Icon::Gear, theme::ICON_LARGE, theme::TEXT))
                 .style(button::text)
                 .on_press(Message::OpenSettings),
         ]
+        .spacing(theme::GAP)
         .align_y(Alignment::Center),
         row![
-            // ponytail: a coloured dot stands in for the status glyph until our SVG icons land.
-            dot(status_colour(app.state)),
+            status_icon(app.state),
             text(app.state.headline()).size(theme::TEXT_BODY),
         ]
         .spacing(theme::GAP)
@@ -49,16 +51,16 @@ pub fn view(app: &App) -> Element<'_, Message> {
         scrollable(column(app.recent.iter().map(activity)).spacing(theme::GAP)).into()
     };
 
-    let (action_label, action) = match app.state {
-        SyncState::Blocked => ("Sign in", Message::SignIn),
-        SyncState::Paused | SyncState::Disabled => ("Resume", Message::TogglePause),
-        _ => ("Pause", Message::TogglePause),
+    let (action_icon, action_label, action) = match app.state {
+        SyncState::Blocked => (Icon::Key, "Sign in", Message::SignIn),
+        SyncState::Paused | SyncState::Disabled => (Icon::Play, "Resume", Message::TogglePause),
+        _ => (Icon::Pause, "Pause", Message::TogglePause),
     };
     let footer = container(
         row![
-            footer_button("Open folder", None),
-            footer_button("View online", None),
-            footer_button(action_label, Some(action)),
+            footer_button(Icon::Folder, "Open folder", None),
+            footer_button(Icon::Globe, "View online", None),
+            footer_button(action_icon, action_label, Some(action)),
         ]
         .spacing(theme::GAP),
     )
@@ -76,7 +78,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
 }
 
 fn activity(item: &Activity) -> Element<'_, Message> {
-    column![
+    let lines = column![
         text(&item.name).size(theme::TEXT_BODY),
         row![
             text(item.action)
@@ -91,39 +93,41 @@ fn activity(item: &Activity) -> Element<'_, Message> {
             .size(theme::TEXT_SMALL)
             .color(theme::TEXT_SECONDARY),
     ]
-    .spacing(2)
+    .spacing(2);
+    row![
+        icon(Icon::File, theme::ICON_FILE, theme::TEXT_SECONDARY),
+        lines
+    ]
+    .spacing(theme::GAP)
     .padding([0.0, theme::PADDING])
+    .align_y(Alignment::Center)
     .into()
 }
 
-fn footer_button(label: &str, message: Option<Message>) -> Element<'_, Message> {
-    button(text(label).size(theme::TEXT_BODY).center())
-        .style(button::text)
-        .width(Length::Fill)
-        .on_press_maybe(message)
-        .into()
+fn footer_button(glyph: Icon, label: &str, message: Option<Message>) -> Element<'_, Message> {
+    button(
+        column![
+            icon(glyph, theme::ICON_LARGE, theme::TEXT),
+            text(label).size(theme::TEXT_BODY)
+        ]
+        .spacing(theme::GAP)
+        .align_x(Alignment::Center),
+    )
+    .style(button::text)
+    .width(Length::Fill)
+    .on_press_maybe(message)
+    .into()
 }
 
-fn status_colour(state: SyncState) -> iced::Color {
-    match state {
-        SyncState::Idle => theme::SUCCESS,
-        SyncState::Syncing => theme::ACCENT,
-        SyncState::Paused | SyncState::Warning => theme::WARNING,
-        SyncState::Blocked | SyncState::Disabled | SyncState::Error => theme::DANGER,
-    }
-}
-
-fn dot<'a>(colour: iced::Color) -> Element<'a, Message> {
-    container(space::horizontal())
-        .width(10)
-        .height(10)
-        .style(move |_| container::Style {
-            background: Some(colour.into()),
-            border: Border {
-                radius: 5.0.into(),
-                ..Border::default()
-            },
-            ..container::Style::default()
-        })
-        .into()
+/// The glyph and colour of the status line, after the Windows flyout.
+fn status_icon<'a>(state: SyncState) -> Element<'a, Message> {
+    let (glyph, colour) = match state {
+        SyncState::Idle => (Icon::Check, theme::SUCCESS),
+        SyncState::Syncing => (Icon::Sync, theme::ACCENT),
+        SyncState::Paused => (Icon::Pause, theme::WARNING),
+        SyncState::Warning => (Icon::Warning, theme::WARNING),
+        SyncState::Error | SyncState::Disabled => (Icon::Error, theme::DANGER),
+        SyncState::Blocked => (Icon::Key, theme::DANGER),
+    };
+    icon(glyph, theme::ICON, colour)
 }

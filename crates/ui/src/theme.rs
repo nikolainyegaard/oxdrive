@@ -33,6 +33,10 @@ pub fn theme() -> Theme {
     )
 }
 
+pub const ICON: f32 = 16.0;
+pub const ICON_LARGE: f32 = 20.0;
+pub const ICON_FILE: f32 = 32.0;
+
 pub const SETTINGS_SIZE: (u32, u32) = (900, 680);
 pub const SIDEBAR_WIDTH: f32 = 240.0;
 pub const TEXT_HEADING: f32 = 28.0;

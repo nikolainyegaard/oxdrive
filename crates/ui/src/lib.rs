@@ -2,6 +2,7 @@
 //! on tray click and removed on the next click, so it never is a window the user can drag.
 
 mod flyout;
+mod icons;
 mod settings;
 pub mod theme;
 

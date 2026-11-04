@@ -25,6 +25,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Flyout activity rows with folder and relative time, status dot, footer bar
 - Sign in opens a popup window in a Chromium-family browser when one is installed, closed when the sign-in lands
 - Resume also restarts a client that stopped on its own
+- In-app icons: our own SVGs in the flyout header, status line, activity rows, footer and settings sidebar, replaceable from ~/.config/oxdrive/icons
 - Start OneDrive when I sign in, through an XDG autostart entry
 - Profile picker and sign-in address per profile, saved in `~/.config/oxdrive/settings`
 - Notify me when syncing is paused, through notify-send

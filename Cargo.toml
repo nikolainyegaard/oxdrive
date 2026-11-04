@@ -13,7 +13,7 @@ repository = "https://github.com/nikolainyegaard/oxdrive"
 oxdrive-core = { path = "crates/core" }
 oxdrive-native = { path = "crates/native" }
 oxdrive-ui = { path = "crates/ui" }
-iced = { version = "0.14", default-features = false, features = ["wgpu", "wayland", "thread-pool"] }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "wayland", "thread-pool", "svg"] }
 iced_layershell = "0.19"
 ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
 futures = "0.3"

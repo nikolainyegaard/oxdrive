@@ -4,12 +4,25 @@ use std::path::PathBuf;
 
 use oxdrive_core::settings::Settings;
 
-fn path() -> Option<PathBuf> {
+/// `$XDG_CONFIG_HOME/oxdrive`, else `~/.config/oxdrive`.
+fn config_dir() -> Option<PathBuf> {
     let dir = std::env::var_os("XDG_CONFIG_HOME").map_or_else(
         || std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")),
         |c| Some(PathBuf::from(c)),
     )?;
-    Some(dir.join("oxdrive").join("settings"))
+    Some(dir.join("oxdrive"))
+}
+
+fn path() -> Option<PathBuf> {
+    Some(config_dir()?.join("settings"))
+}
+
+/// `icons/<name>.svg` under the config directory, when the user has put one there to replace
+/// the built-in icon of that name.
+#[must_use]
+pub fn custom_icon(name: &str) -> Option<PathBuf> {
+    let path = config_dir()?.join("icons").join(format!("{name}.svg"));
+    path.is_file().then_some(path)
 }
 
 /// The saved settings, or the defaults when there is no file yet.

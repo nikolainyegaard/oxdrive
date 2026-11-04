@@ -7,6 +7,7 @@ use iced::{Alignment, Border, Element, Length, Theme};
 
 use oxdrive_core::status::{SyncState, human_size, storage_line};
 
+use crate::icons::{Icon, icon};
 use crate::theme;
 use crate::{App, Message};
 
@@ -27,6 +28,15 @@ impl Page {
         Self::About,
     ];
 
+    fn icon(self) -> Icon {
+        match self {
+            Self::SyncAndBackup => Icon::Sync,
+            Self::Account => Icon::Person,
+            Self::Notifications => Icon::Bell,
+            Self::About => Icon::Info,
+        }
+    }
+
     fn label(self) -> &'static str {
         match self {
             Self::SyncAndBackup => "Sync and backup",
@@ -40,7 +50,6 @@ impl Page {
 pub fn view(app: &App) -> Element<'_, Message> {
     let nav = column(Page::ALL.map(|page| {
         let selected = page == app.page;
-        // ponytail: no icons yet; the accent bar alone marks the selected page until our SVGs land.
         let marker = container(space::horizontal())
             .width(3)
             .height(16)
@@ -53,9 +62,13 @@ pub fn view(app: &App) -> Element<'_, Message> {
                 ..container::Style::default()
             });
         button(
-            row![marker, text(page.label()).size(theme::TEXT_BODY)]
-                .spacing(theme::GAP + 4.0)
-                .align_y(Alignment::Center),
+            row![
+                marker,
+                icon(page.icon(), theme::ICON, theme::TEXT),
+                text(page.label()).size(theme::TEXT_BODY)
+            ]
+            .spacing(theme::GAP + 4.0)
+            .align_y(Alignment::Center),
         )
         .style(move |_, status| nav_style(selected, status))
         .padding([theme::GAP, theme::GAP])

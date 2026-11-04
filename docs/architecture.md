@@ -28,6 +28,7 @@ oxdrive/
 ├── crates/ui/              # iced views, theme, the layer-shell daemon
 │   ├── src/lib.rs          # App state, Message, update, the tray channel bridge, run()
 │   ├── src/flyout.rs       # the flyout view
+│   ├── src/icons.rs        # our SVG glyphs, compiled in, overridable from ~/.config/oxdrive/icons
 │   ├── src/settings.rs     # the settings window: sidebar, four pages
 │   └── src/theme.rs        # design tokens
 ├── assets/                 # our own icons, when drawn
@@ -60,7 +61,7 @@ One line each. A new direct dependency gets a row here in the same change.
 
 | Crate | Why |
 |-------|-----|
-| iced 0.14 | The UI toolkit. Features `wgpu`, `wayland`, `thread-pool` only. |
+| iced 0.14 | The UI toolkit. Features `wgpu`, `wayland`, `thread-pool`, and `svg` for the in-app icons (resvg; about 2 MB of binary, measured 2026-11-04). |
 | iced_layershell 0.19 | wlr-layer-shell surfaces for iced, which is what makes an anchored flyout possible on Wayland. |
 | ksni 0.3 | Pure Rust StatusNotifierItem over D-Bus. Features `blocking` and `async-io`; no tokio. |
 | futures 0.3 | The channel between the tray thread and the iced subscription, and stream adapters. |

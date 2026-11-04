@@ -23,6 +23,9 @@ All in `crates/ui/src/theme.rs`. Views name a token, never a colour or size.
 | SIDEBAR_WIDTH | 240 | Settings navigation column |
 | TEXT_HEADING | 28 | Settings page title |
 | TEXT_SMALL | 12 | Storage line, hints |
+| ICON | 16 | Status mark, sidebar page icons |
+| ICON_LARGE | 20 | Cloud and gear in the flyout header, footer buttons |
+| ICON_FILE | 32 | File icon on an activity row |
 | CARD | #2B2B2B | Settings cards and the selected sidebar item |
 | CARD_RADIUS | 4 | Card corners |
 
@@ -42,9 +45,22 @@ The seven states are the Windows set. Our icons: seven SVGs under `assets/tray/`
 
 ## Flyout layout
 
-Top to bottom: title row (`OneDrive - <tenant>` or `OneDrive`, Settings at the right), status headline behind a coloured dot (green idle, blue syncing, yellow paused or warning, red otherwise; the dot stands in for the status glyph until our SVG icons land), recent activity list (or "No recent activity"), spacer, footer bar on the card colour with three equal text buttons: Open folder, View online, and the action: Pause, Resume when paused or stopped, Sign in when blocked.
+Top to bottom: title row (blue cloud, `OneDrive - <tenant>` or `OneDrive`, gear at the right for Settings), status headline behind its mark (check in green when idle, sync arrows in blue, pause in yellow, warning triangle in yellow, error cross in red, key in red when blocked), recent activity list (or "No recent activity"), spacer, footer bar on the card colour with three equal buttons, icon over label: folder for Open folder, globe for View online, and the action (pause, play for Resume, key for Sign in): Pause, Resume when paused or stopped, Sign in when blocked.
 
 An activity row is the file name, then `Uploaded to <folder>` or `Deleted from <folder>` with the folder in the accent colour (`OneDrive` for the sync root), then a relative time: `just now`, `14 seconds ago`, `18 hours ago`. The time is computed when the flyout is drawn, so it only moves on the next event.
+
+## In-app icons
+
+Fifteen SVGs under `assets/icons/`, drawn by us: 20 x 20 viewBox, 1.5 px white strokes, round caps, no fill. They are compiled in (`ui::icons`) and recoloured per use through iced's svg style, so one file serves every colour. A file of the same name under `~/.config/oxdrive/icons/` replaces the built-in one at the next view (config.md).
+
+| Name | Used for |
+|------|----------|
+| cloud, gear | Flyout header |
+| check, sync, pause, warning, error, key | Status mark per state; sync, person, bell, info are also the sidebar pages |
+| file | Activity row |
+| folder, globe, play | Footer buttons |
+
+The tray icon still names theme icons (`SyncState::icon_name`); our own tray set is a separate slice.
 
 ## Settings window
 
