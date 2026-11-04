@@ -20,6 +20,7 @@ oxdrive/
 │   ├── src/autostart.rs    # the XDG autostart desktop file
 │   ├── src/client.rs       # spawns onedrive --monitor, reads its output on two threads
 │   ├── src/desktop.rs      # xdg-open and notify-send
+│   ├── src/popup.rs        # the sign-in popup: xdg-open shim and a Chromium app window
 │   ├── src/realm.rs        # asks Microsoft for the tenant name through curl
 │   ├── src/settings.rs     # reads and writes ~/.config/oxdrive/settings
 │   ├── examples/realm.rs   # prints the title for an address
