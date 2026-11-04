@@ -55,6 +55,9 @@ pub fn spawn(
         .arg("--disable-notifications");
     if reauth {
         command.arg("--reauth");
+        if let Some(path) = crate::popup::child_path() {
+            command.env("PATH", path);
+        }
     }
     let mut child = command
         .stdin(Stdio::null())

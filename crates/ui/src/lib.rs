@@ -24,7 +24,7 @@ use oxdrive_core::settings::Settings;
 use oxdrive_core::status::SyncState;
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
-use oxdrive_native::{autostart, desktop, realm};
+use oxdrive_native::{autostart, desktop, popup, realm};
 
 pub use settings::Page;
 
@@ -232,6 +232,7 @@ impl App {
             }
         }
         if signed_in && let Some(profile) = &self.profile {
+            popup::close();
             client::quota(&profile.config_dir, self.client_tx.clone());
         }
         signed_in

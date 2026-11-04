@@ -8,6 +8,7 @@ description = "OneDrive tray client for Linux"
 
 [dependencies]
 oxdrive-ui.workspace = true
+oxdrive-native.workspace = true
 # iced_exdevtools 0.19.1 does not compile against winit-core 0.31.0-beta.4; drop this pin when
 # iced_layershell releases against a stable winit 0.31. See docs/gotchas.md.
 winit-core = "=0.31.0-beta.2"

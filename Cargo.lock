@@ -2306,6 +2306,7 @@ dependencies = [
 name = "oxdrive"
 version = "0.1.0"
 dependencies = [
+ "oxdrive-native",
  "oxdrive-ui",
  "winit-core",
 ]
