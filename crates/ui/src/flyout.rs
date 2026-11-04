@@ -51,7 +51,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
 
     let (action_label, action) = match app.state {
         SyncState::Blocked => ("Sign in", Message::SignIn),
-        SyncState::Paused => ("Resume", Message::TogglePause),
+        SyncState::Paused | SyncState::Disabled => ("Resume", Message::TogglePause),
         _ => ("Pause", Message::TogglePause),
     };
     let footer = container(

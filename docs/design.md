@@ -42,7 +42,7 @@ The seven states are the Windows set. Our icons: seven SVGs under `assets/tray/`
 
 ## Flyout layout
 
-Top to bottom: title row (`OneDrive - <tenant>` or `OneDrive`, Settings at the right), status headline behind a coloured dot (green idle, blue syncing, yellow paused or warning, red otherwise; the dot stands in for the status glyph until our SVG icons land), recent activity list (or "No recent activity"), spacer, footer bar on the card colour with three equal text buttons: Open folder, View online, and the action: Pause, Resume when paused, Sign in when blocked.
+Top to bottom: title row (`OneDrive - <tenant>` or `OneDrive`, Settings at the right), status headline behind a coloured dot (green idle, blue syncing, yellow paused or warning, red otherwise; the dot stands in for the status glyph until our SVG icons land), recent activity list (or "No recent activity"), spacer, footer bar on the card colour with three equal text buttons: Open folder, View online, and the action: Pause, Resume when paused or stopped, Sign in when blocked.
 
 An activity row is the file name, then `Uploaded to <folder>` or `Deleted from <folder>` with the folder in the accent colour (`OneDrive` for the sync root), then a relative time: `just now`, `14 seconds ago`, `18 hours ago`. The time is computed when the flyout is drawn, so it only moves on the next event.
 

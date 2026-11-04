@@ -178,7 +178,8 @@ impl App {
 
     /// Stops the client (SIGTERM) or starts it again for the current profile.
     fn toggle_pause(&mut self) {
-        if self.state == SyncState::Paused {
+        // Paused, or stopped for any reason: start again. Only a running client gets paused.
+        if self.state == SyncState::Paused || self.client.is_none() {
             self.start_client(false, SyncState::Syncing);
         } else if self.client.take().is_some() {
             self.set_state(SyncState::Paused);
