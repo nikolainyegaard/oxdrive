@@ -10,7 +10,7 @@ use crate::{App, Message};
 
 pub fn view(app: &App) -> Element<'_, Message> {
     let header = column![
-        text("OneDrive").size(theme::TEXT_TITLE),
+        text(&app.title).size(theme::TEXT_TITLE),
         text(&app.account)
             .size(theme::TEXT_BODY)
             .color(theme::TEXT_SECONDARY),

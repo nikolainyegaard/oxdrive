@@ -19,6 +19,7 @@ use oxdrive_core::client::Event;
 use oxdrive_core::profiles::Profile;
 use oxdrive_core::status::SyncState;
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
+use oxdrive_native::realm;
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
 
 /// The tray thread's receiver is parked here until the iced runtime asks for the subscription,
@@ -43,6 +44,8 @@ pub enum Message {
 
 pub struct App {
     pub state: SyncState,
+    /// The flyout header: `OneDrive - <tenant>` once the address is known, else `OneDrive`.
+    pub title: String,
     pub account: String,
     pub recent: Vec<String>,
     /// Shown under the headline when the client has something to say.
@@ -275,8 +278,15 @@ pub fn run() -> oxdrive_core::Result<()> {
     let account = profile
         .as_ref()
         .map_or_else(|| "Not signed in".into(), |p| p.name.clone());
+    // ponytail: OXDRIVE_EMAIL is a test hook until settings hold the sign-in address; the lookup
+    // blocks startup for up to ten seconds when Microsoft is slow
+    let title = std::env::var("OXDRIVE_EMAIL")
+        .ok()
+        .and_then(|email| realm::lookup(&email).ok())
+        .unwrap_or_else(|| "OneDrive".into());
     let boot = move || App {
         state,
+        title: title.clone(),
         account: account.clone(),
         recent: Vec::new(),
         detail: detail.clone(),
