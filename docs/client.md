@@ -25,6 +25,16 @@ If the client that opened the tab is gone by the time the browser redirects, the
 
 The MFA-expired case is a real one (fixture `monitor-auth-expired.txt`): the client prints an `AADSTS50078` line and then `ERROR: You will need to issue a --reauth and re-authorise this client to obtain a fresh auth token.` and exits. That is the Blocked state.
 
+## The tenant name
+
+The Windows client titles its flyout `OneDrive - <tenant>` for work and school accounts and `OneDrive - Personal` for Microsoft accounts. The onedrive client never prints the tenant: it only says `Account Type: business` or `personal`, and the tenant name on Graph sits behind `GET /organization`, a scope the client does not ask for.
+
+The sign-in page gets the name without any token. Before it knows where to send the browser it asks home realm discovery, `https://login.microsoftonline.com/getuserrealm.srf?login=<email>&json=1`, which is public and answers with `FederationBrandName`. `native::realm::lookup` runs that query through `curl` and `core::realm::title` turns the reply into the title: brand `Windows Live` means Personal, any other brand is the tenant, no brand means the domain is not Microsoft's. The sign-in address is the one input the client cannot give us; it comes from settings. Try it:
+
+```
+cargo run -p oxdrive-native --example realm -- user@example.com
+```
+
 ## Fixtures
 
 Captured from onedrive v2.5.11 on 2026-11-02, business account, Plasma session. Secrets, drive and root IDs, trace IDs, user name and real paths are replaced; the line formats are untouched. Monitor runs used `-v`, the same flag OneDriveGUI passes, so the fixtures show the verbose set and the plain set is a subset of it. Per-directory lines (`Monitoring directory:`, `Processing:`, `The file has not changed`, `Stopped monitoring directory`) repeat once per item in reality; the fixture keeps a few of each.

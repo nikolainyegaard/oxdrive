@@ -19,5 +19,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - Sign in from the flyout when the token has expired; the client opens the browser and syncing resumes and the flyout opens once the sign-in lands
 - Recent activity list with uploads and deletes
 - Quit stops the client cleanly
+- Tenant name lookup for the flyout title, `OneDrive - <tenant>` or `OneDrive - Personal`, through Microsoft's home realm discovery
 
 [Unreleased]: https://github.com/nikolainyegaard/oxdrive/commits/main
