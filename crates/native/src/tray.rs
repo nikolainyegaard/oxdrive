@@ -130,6 +130,19 @@ impl TrayHandle {
     pub fn set_state(&self, state: SyncState) {
         self.0.update(|tray| tray.state = state);
     }
+
+    /// Rasterises the icon set again, after the user changed it.
+    pub fn reload_icons(&self) {
+        self.0.update(|tray| tray.pixmaps = pixmaps());
+    }
+}
+
+fn pixmaps() -> Vec<(SyncState, Vec<ksni::Icon>)> {
+    SyncState::ALL
+        .into_iter()
+        .map(|state| (state, crate::icons::tray_pixmaps(state)))
+        .filter(|(_, icons)| !icons.is_empty())
+        .collect()
 }
 
 /// Starts the tray service on a background thread.
@@ -142,11 +155,7 @@ pub fn spawn(events: UnboundedSender<TrayEvent>) -> oxdrive_core::Result<TrayHan
         events,
         pixmaps: {
             crate::icons::install();
-            SyncState::ALL
-                .into_iter()
-                .map(|state| (state, crate::icons::tray_pixmaps(state)))
-                .filter(|(_, icons)| !icons.is_empty())
-                .collect()
+            pixmaps()
         },
     }
     .spawn()

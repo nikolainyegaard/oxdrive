@@ -1,5 +1,6 @@
-//! The settings window: a sidebar with four pages and the storage line, like the Windows client.
+//! The settings window: a sidebar with five pages and the storage line, like the Windows client.
 
+use iced::widget::svg::Handle;
 use iced::widget::{
     button, column, container, pick_list, progress_bar, row, space, text, text_input, toggler,
 };
@@ -7,7 +8,7 @@ use iced::{Alignment, Border, Element, Length, Theme};
 
 use oxdrive_core::status::{SyncState, human_size, storage_line};
 
-use crate::icons::{Icon, icon};
+use crate::icons::{Icon, icon, picture};
 use crate::theme;
 use crate::{App, Message};
 
@@ -17,14 +18,16 @@ pub enum Page {
     SyncAndBackup,
     Account,
     Notifications,
+    Icons,
     About,
 }
 
 impl Page {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 5] = [
         Self::SyncAndBackup,
         Self::Account,
         Self::Notifications,
+        Self::Icons,
         Self::About,
     ];
 
@@ -33,6 +36,7 @@ impl Page {
             Self::SyncAndBackup => Icon::Sync,
             Self::Account => Icon::Person,
             Self::Notifications => Icon::Bell,
+            Self::Icons => Icon::Image,
             Self::About => Icon::Info,
         }
     }
@@ -42,6 +46,7 @@ impl Page {
             Self::SyncAndBackup => "Sync and backup",
             Self::Account => "Account",
             Self::Notifications => "Notifications",
+            Self::Icons => "Icons",
             Self::About => "About",
         }
     }
@@ -101,6 +106,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         Page::SyncAndBackup => sync_and_backup(app),
         Page::Account => account(app),
         Page::Notifications => notifications(app),
+        Page::Icons => icons(app),
         Page::About => about(app),
     };
     let content = column![
@@ -245,6 +251,74 @@ fn notifications(app: &App) -> Element<'_, Message> {
         app.notify_when_paused(),
         Message::SetNotifyPaused,
     ))
+    .into()
+}
+
+/// Two rows of slots: the icons in use above, the files picked for the new set below. Save
+/// copies the files in; a set is all seven or nothing.
+fn icons(app: &App) -> Element<'_, Message> {
+    use oxdrive_native::icons::{SLOTS, slot_svg};
+    const BOX: f32 = 64.0;
+    fn frame<'a>(content: Element<'a, Message>) -> container::Container<'a, Message> {
+        container(content)
+            .width(BOX)
+            .height(BOX)
+            .center(BOX)
+            .style(|_| container::Style {
+                background: Some(theme::BUTTON.into()),
+                border: Border {
+                    radius: theme::CARD_RADIUS.into(),
+                    ..Border::default()
+                },
+                ..container::Style::default()
+            })
+    }
+    let slot = |i: usize, (name, label): (&'static str, &'static str)| {
+        let current = picture(Handle::from_memory(slot_svg(name)), theme::ICON_FILE);
+        let picked: Element<'_, Message> = match app.icon_picks.get(i).and_then(|p| p.as_ref()) {
+            Some(path) => picture(Handle::from_path(path), theme::ICON_FILE),
+            None => text("+")
+                .size(theme::TEXT_HEADING)
+                .color(theme::TEXT_SECONDARY)
+                .into(),
+        };
+        column![
+            frame(current),
+            text(label)
+                .size(theme::TEXT_SMALL)
+                .color(theme::TEXT_SECONDARY),
+            icon(Icon::ArrowDown, theme::ICON, theme::TEXT_SECONDARY),
+            button(frame(picked))
+                .style(button::text)
+                .padding(0)
+                .on_press(Message::PickIcon(i)),
+        ]
+        .spacing(4)
+        .width(BOX)
+        .align_x(Alignment::Center)
+        .into()
+    };
+    let slots = row(SLOTS.into_iter().enumerate().map(|(i, s)| slot(i, s))).spacing(theme::GAP);
+    column![
+        section("Icon set", card(column![
+            text("The first icon is the app: launcher, window header, flyout header and the tray when everything is synced. The rest are the tray in each other state. Click a box below to choose an SVG file; Save copies the files into the icon storage, so the originals can move.")
+                .size(theme::TEXT_BODY)
+                .color(theme::TEXT_SECONDARY),
+            slots,
+            row![
+                button(text("Save").size(theme::TEXT_BODY))
+                    .style(grey)
+                    .padding([theme::GAP, theme::PADDING])
+                    .on_press(Message::SaveIcons),
+                button(text("Use built-in icons").size(theme::TEXT_BODY))
+                    .style(button::text)
+                    .padding([theme::GAP, theme::PADDING])
+                    .on_press(Message::ResetIcons),
+            ]
+            .spacing(theme::GAP),
+        ]
+        .spacing(theme::PADDING))),
+    ]
     .into()
 }
 

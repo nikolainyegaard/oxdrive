@@ -30,7 +30,7 @@ oxdrive/
 │   ├── src/lib.rs          # App state, Message, update, the tray channel bridge, run()
 │   ├── src/flyout.rs       # the flyout view
 │   ├── src/icons.rs        # our SVG glyphs, compiled in, overridable from ~/.config/oxdrive/icons
-│   ├── src/settings.rs     # the settings window: sidebar, four pages
+│   ├── src/settings.rs     # the settings window: sidebar, five pages
 │   └── src/theme.rs        # design tokens
 ├── assets/                 # our own icons, when drawn
 └── docs/

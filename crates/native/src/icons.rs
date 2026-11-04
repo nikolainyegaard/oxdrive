@@ -1,10 +1,10 @@
 //! Icon files on disk. Built-in SVGs are compiled in; a file of the same name under
 //! `~/.config/oxdrive/icons/` replaces one, so the whole set can be swapped (docs/config.md).
 //!
-//! One app icon serves everywhere: the launcher and window header through a hicolor copy, the
-//! flyout header through `app_svg`, and the tray, where each state is that icon with a badge
-//! drawn over it (none when idle, dimmed when disabled). A custom `tray-<state>.svg` replaces
-//! the whole composed icon for that state.
+//! The set is seven slots (`SLOTS`): the app icon, which is also the idle tray icon, the
+//! launcher, the window header and the flyout header, and one tray icon per other state. A user
+//! set replaces the slots by name under `~/.config/oxdrive/icons/`, from the settings window or
+//! by hand.
 //!
 //! The tray gets pixmaps over D-Bus, rasterised here with resvg: Plasma ignored both layouts of
 //! `IconThemePath` (probed 2026-11-04), and every host honours `IconPixmap`.
@@ -44,27 +44,81 @@ fn bytes(name: &str, builtin: &'static [u8]) -> Vec<u8> {
         .unwrap_or_else(|| builtin.to_vec())
 }
 
+/// The icon slots, file name and label, in the order the settings page shows them.
+pub const SLOTS: [(&str, &str); 7] = [
+    ("app", "App"),
+    ("tray-syncing", "Syncing"),
+    ("tray-paused", "Paused"),
+    ("tray-warning", "Warning"),
+    ("tray-error", "Error"),
+    ("tray-blocked", "Sign in"),
+    ("tray-disabled", "Stopped"),
+];
+
+fn builtin(slot: &str) -> &'static [u8] {
+    macro_rules! asset {
+        ($path:literal) => {
+            include_bytes!(concat!("../../../assets/", $path))
+        };
+    }
+    match slot {
+        "tray-syncing" => asset!("tray/syncing.svg"),
+        "tray-paused" => asset!("tray/paused.svg"),
+        "tray-warning" => asset!("tray/warning.svg"),
+        "tray-error" => asset!("tray/error.svg"),
+        "tray-blocked" => asset!("tray/blocked.svg"),
+        "tray-disabled" => asset!("tray/disabled.svg"),
+        _ => asset!("app.svg"),
+    }
+}
+
+/// The SVG in a slot: the user's file, else ours.
+#[must_use]
+pub fn slot_svg(slot: &str) -> Vec<u8> {
+    bytes(slot, builtin(slot))
+}
+
 /// The app icon, the user's `app.svg` or ours.
 #[must_use]
 pub fn app_svg() -> Vec<u8> {
-    bytes("app", include_bytes!("../../../assets/app.svg"))
+    slot_svg("app")
 }
 
-/// The badge drawn over the app icon for a state; idle and disabled have none.
-fn badge(state: SyncState) -> Option<&'static [u8]> {
-    macro_rules! asset {
-        ($name:literal) => {
-            include_bytes!(concat!("../../../assets/tray/", $name, ".svg"))
-        };
-    }
+fn slot_for(state: SyncState) -> String {
     match state {
-        SyncState::Idle | SyncState::Disabled => None,
-        SyncState::Syncing => Some(asset!("syncing")),
-        SyncState::Paused => Some(asset!("paused")),
-        SyncState::Warning => Some(asset!("warning")),
-        SyncState::Error => Some(asset!("error")),
-        SyncState::Blocked => Some(asset!("blocked")),
+        SyncState::Idle => "app".to_owned(),
+        other => format!("tray-{}", other.slug()),
     }
+}
+
+/// Copies one file per slot into the icons directory and refreshes the installed app icon.
+///
+/// # Errors
+/// A file could not be read or written.
+pub fn replace_set(picks: &[(&str, &Path)]) -> oxdrive_core::Result<()> {
+    use std::os::unix::fs::DirBuilderExt as _;
+    let dir = config_dir().ok_or("no home directory")?.join("icons");
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&dir)
+        .map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+    for (slot, from) in picks {
+        std::fs::copy(from, dir.join(format!("{slot}.svg")))
+            .map_err(|e| format!("could not copy {}: {e}", from.display()))?;
+    }
+    install();
+    Ok(())
+}
+
+/// Removes the user's slot files, so the built-in set shows again.
+pub fn clear_set() {
+    for (slot, _) in SLOTS {
+        if let Some(path) = custom(slot) {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+    install();
 }
 
 /// Writes the file only when its content differs, so an unchanged start touches nothing.
@@ -79,49 +133,33 @@ fn put(path: &Path, content: &[u8]) -> std::io::Result<()> {
 }
 
 /// The tray pixmaps for one state, 22 and 44 px, ARGB32 in network byte order as the
-/// StatusNotifierItem spec wants them. Empty when an SVG does not parse.
+/// StatusNotifierItem spec wants them. Empty when the SVG does not parse.
 #[must_use]
 pub fn tray_pixmaps(state: SyncState) -> Vec<ksni::Icon> {
-    let parse = |svg: &[u8]| resvg::usvg::Tree::from_data(svg, &resvg::usvg::Options::default());
-    let layers: Vec<resvg::usvg::Tree> = match custom(&format!("tray-{}", state.slug())) {
-        Some(path) => std::fs::read(path)
-            .ok()
-            .and_then(|svg| parse(&svg).ok())
-            .into_iter()
-            .collect(),
-        None => [Some(app_svg()), badge(state).map(<[u8]>::to_vec)]
-            .into_iter()
-            .flatten()
-            .filter_map(|svg| parse(&svg).ok())
-            .collect(),
-    };
-    if layers.is_empty() {
+    let svg = slot_svg(&slot_for(state));
+    let Ok(tree) = resvg::usvg::Tree::from_data(&svg, &resvg::usvg::Options::default()) else {
         return Vec::new();
-    }
-    let dim = if state == SyncState::Disabled { 2 } else { 1 };
+    };
     [22, 44]
         .into_iter()
-        .filter_map(|size| rasterise(&layers, size, dim))
+        .filter_map(|size| rasterise(&tree, size))
         .collect()
 }
 
-/// Draws the layers in order at `size` px, alpha divided by `dim`.
-fn rasterise(layers: &[resvg::usvg::Tree], size: u32, dim: u8) -> Option<ksni::Icon> {
+fn rasterise(tree: &resvg::usvg::Tree, size: u32) -> Option<ksni::Icon> {
     let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)?;
-    for tree in layers {
-        let scale = size as f32 / tree.size().width().max(tree.size().height());
-        resvg::render(
-            tree,
-            resvg::tiny_skia::Transform::from_scale(scale, scale),
-            &mut pixmap.as_mut(),
-        );
-    }
+    let scale = size as f32 / tree.size().width().max(tree.size().height());
+    resvg::render(
+        tree,
+        resvg::tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
     let data = pixmap
         .pixels()
         .iter()
         .flat_map(|p| {
             let c = p.demultiply();
-            [c.alpha() / dim, c.red(), c.green(), c.blue()]
+            [c.alpha(), c.red(), c.green(), c.blue()]
         })
         .collect();
     Some(ksni::Icon {

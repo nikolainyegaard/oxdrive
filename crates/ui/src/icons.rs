@@ -20,6 +20,8 @@ pub enum Icon {
     Person,
     Bell,
     Info,
+    Image,
+    ArrowDown,
 }
 
 impl Icon {
@@ -40,6 +42,8 @@ impl Icon {
             Self::Person => "person",
             Self::Bell => "bell",
             Self::Info => "info",
+            Self::Image => "image",
+            Self::ArrowDown => "arrow-down",
         }
     }
 
@@ -64,6 +68,8 @@ impl Icon {
             Self::Person => asset!("person"),
             Self::Bell => asset!("bell"),
             Self::Info => asset!("info"),
+            Self::Image => asset!("image"),
+            Self::ArrowDown => asset!("arrow-down"),
         }
     }
 
@@ -79,10 +85,12 @@ impl Icon {
 
 /// The app icon in its own colours: the same file the tray and the launcher show.
 pub fn app<'a, Message: 'a>(size: f32) -> Element<'a, Message> {
-    Svg::new(Handle::from_memory(oxdrive_native::icons::app_svg()))
-        .width(size)
-        .height(size)
-        .into()
+    picture(Handle::from_memory(oxdrive_native::icons::app_svg()), size)
+}
+
+/// An SVG shown as is, in its own colours.
+pub fn picture<'a, Message: 'a>(handle: Handle, size: f32) -> Element<'a, Message> {
+    Svg::new(handle).width(size).height(size).into()
 }
 
 /// The icon at `size` pixels square, every stroke in `color`.
@@ -115,6 +123,8 @@ mod tests {
             Icon::Person,
             Icon::Bell,
             Icon::Info,
+            Icon::Image,
+            Icon::ArrowDown,
         ] {
             let text = std::str::from_utf8(icon.bytes()).unwrap_or_default();
             assert!(text.starts_with("<svg"), "{} is not an svg", icon.name());

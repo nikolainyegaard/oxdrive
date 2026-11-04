@@ -24,7 +24,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Storage bar and `used of total` line from `--display-quota`
 - Flyout activity rows with folder and relative time, status dot, footer bar
 - Recent activity kept per profile under `~/.local/state/oxdrive/`, so the list survives a restart
-- One app icon for the launcher, window header, flyout header and tray; tray states badge it
+- One icon set of seven slots: the app icon for the launcher, window header, flyout header and idle tray, one tray icon per other state
+- Icons page in Settings to replace the set file by file, copied into `~/.config/oxdrive/icons/`
 - Sign in opens a popup window in a Chromium-family browser when one is installed, closed when the sign-in lands
 - Resume also restarts a client that stopped on its own
 - Our own icons: seven tray states and the app icon, served to the tray as pixmaps, plus in-app glyphs in the flyout header, status line, activity rows, footer and settings sidebar; any of them replaceable from ~/.config/oxdrive/icons

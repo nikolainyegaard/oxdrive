@@ -6,6 +6,7 @@ mod icons;
 mod settings;
 pub mod theme;
 
+use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
 
 use futures::StreamExt as _;
@@ -65,6 +66,11 @@ pub enum Message {
     TitleFound(oxdrive_core::Result<String>),
     SelectProfile(String),
     OpenUrl(&'static str),
+    /// Open the file dialog for one icon slot.
+    PickIcon(usize),
+    IconPicked(usize, Option<PathBuf>),
+    SaveIcons,
+    ResetIcons,
 }
 
 pub struct App {
@@ -83,6 +89,8 @@ pub struct App {
     pub page: Page,
     /// What went wrong on the settings page, if anything.
     pub notice: Option<String>,
+    /// Files chosen on the Icons page, one per slot, until Save copies them in.
+    pub icon_picks: Vec<Option<PathBuf>>,
     pub autostart: bool,
     /// The sign-in address as typed, saved once a lookup succeeds.
     pub email: String,
@@ -367,6 +375,48 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
                 Message::TitleFound,
             )
         }
+        Message::PickIcon(slot) => Task::perform(
+            futures::future::lazy(|_| desktop::pick_svg()),
+            move |path| Message::IconPicked(slot, path),
+        ),
+        Message::IconPicked(slot, path) => {
+            if let Some(pick) = app.icon_picks.get_mut(slot) {
+                *pick = path.or(pick.take());
+            }
+            Task::none()
+        }
+        Message::SaveIcons => {
+            let missing = app.icon_picks.iter().filter(|p| p.is_none()).count();
+            if missing > 0 {
+                app.notice = Some(format!("Choose an icon for every slot, {missing} to go."));
+                return Task::none();
+            }
+            let picks: Vec<(&str, &std::path::Path)> = oxdrive_native::icons::SLOTS
+                .iter()
+                .zip(&app.icon_picks)
+                .filter_map(|((slot, _), pick)| Some((*slot, pick.as_deref()?)))
+                .collect();
+            app.notice = match oxdrive_native::icons::replace_set(&picks) {
+                Ok(()) => {
+                    app.icon_picks.iter_mut().for_each(|p| *p = None);
+                    Some("Icons saved.".into())
+                }
+                Err(why) => Some(why),
+            };
+            if let Some(tray) = &app.tray {
+                tray.reload_icons();
+            }
+            Task::none()
+        }
+        Message::ResetIcons => {
+            oxdrive_native::icons::clear_set();
+            app.icon_picks.iter_mut().for_each(|p| *p = None);
+            if let Some(tray) = &app.tray {
+                tray.reload_icons();
+            }
+            app.notice = Some("Built-in icons are back.".into());
+            Task::none()
+        }
         Message::TitleFound(Ok(title)) => {
             if let Some(name) = app.profile.as_ref().map(|p| p.name.clone()) {
                 let account = app.settings.accounts.entry(name).or_default();
@@ -496,6 +546,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         settings_window: None,
         page: Page::default(),
         notice: None,
+        icon_picks: vec![None; oxdrive_native::icons::SLOTS.len()],
         autostart,
         email: email.clone(),
         free_space: None,
