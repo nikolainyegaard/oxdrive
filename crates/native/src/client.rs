@@ -93,6 +93,32 @@ fn read_lines(source: impl Read, events: &UnboundedSender<ClientEvent>) {
     ));
 }
 
+/// Runs `onedrive --display-quota` on its own thread and reports the `Total:` and `Used:` lines.
+/// The client allows it beside a running monitor; it only reads the token and asks Graph.
+pub fn quota(config_dir: &Path, events: UnboundedSender<ClientEvent>) {
+    let config_dir = config_dir.to_owned();
+    thread::spawn(move || {
+        let Ok(output) = Command::new("onedrive")
+            .arg("--confdir")
+            .arg(config_dir)
+            .arg("--display-quota")
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+        else {
+            return;
+        };
+        for event in String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter_map(parse_line)
+        {
+            if events.unbounded_send(ClientEvent::Event(event)).is_err() {
+                break;
+            }
+        }
+    });
+}
+
 /// Profiles from OneDriveGUI's file, or a single default pointing at `~/.config/onedrive`.
 pub fn profiles() -> Vec<Profile> {
     let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
@@ -110,4 +136,12 @@ pub fn profiles() -> Vec<Profile> {
     } else {
         found
     }
+}
+
+/// `onedrive --version` as printed, for the About page.
+#[must_use]
+pub fn version() -> Option<String> {
+    let output = Command::new("onedrive").arg("--version").output().ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    Some(text.lines().next()?.trim().to_owned()).filter(|s| !s.is_empty())
 }

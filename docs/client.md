@@ -11,7 +11,7 @@ oxdrive drives `onedrive` (abraunegg), minimum v2.5.11, as a child process. The 
 | One-off sync | `onedrive --confdir <dir> --synchronize` |
 | Sign in without a terminal | `onedrive --confdir <dir> --auth-files <url-file>:<response-file>` |
 | Sign in with a pasted URL | `onedrive --confdir <dir> --auth-response <url>` |
-| Quota | `onedrive --confdir <dir> --display-quota` |
+| Quota | `onedrive --confdir <dir> --display-quota`, runs fine beside the monitor |
 | Effective config | `onedrive --confdir <dir> --display-config` |
 | Sync status without syncing | `onedrive --confdir <dir> --display-sync-status` |
 
@@ -60,6 +60,7 @@ From the fixtures above. Each row becomes a parser test.
 | `Successfully deleted item from Microsoft OneDrive: <name>` | Activity entry, delete |
 | `[M] New local file added: <name>` | inotify event, informational |
 | `Remaining Free Space:  <n> GB (<bytes> bytes)` | Quota, printed at start-up |
+| `Total:` and `Used:` with bytes in brackets | Storage bar, from `--display-quota` |
 | `Account Type:          <business|personal>` | Account line |
 | `ERROR: You will need to issue a --reauth ...` | Blocked |
 | `Opening the Microsoft authorisation URL in your default browser ...` | Blocked, with "Finish signing in in your browser" |

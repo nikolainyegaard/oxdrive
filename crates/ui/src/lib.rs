@@ -2,25 +2,31 @@
 //! on tray click and removed on the next click, so it never is a window the user can drag.
 
 mod flyout;
+mod settings;
 pub mod theme;
 
 use std::sync::{Mutex, PoisonError};
+use std::time::Instant;
 
 use futures::StreamExt as _;
 use futures::channel::mpsc;
 use futures::stream::BoxStream;
 use iced::{Element, Subscription, Task};
+use iced_layershell::actions::IcedXdgWindowSettings;
 use iced_layershell::reexport::{
     Anchor, IcedId, KeyboardInteractivity, Layer, NewLayerShellSettings,
 };
-use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
+use iced_layershell::settings::{LayerShellSettings, Settings as DaemonSettings, StartMode};
 use iced_layershell::to_layer_message;
-use oxdrive_core::client::Event;
+use oxdrive_core::client::{Event, folder_and_name};
 use oxdrive_core::profiles::Profile;
+use oxdrive_core::settings::Settings;
 use oxdrive_core::status::SyncState;
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
-use oxdrive_native::realm;
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
+use oxdrive_native::{autostart, desktop, realm};
+
+pub use settings::Page;
 
 /// The tray thread's receiver is parked here until the iced runtime asks for the subscription,
 /// because `Subscription::run` takes a plain fn pointer and cannot capture it.
@@ -38,8 +44,29 @@ pub enum Message {
     TogglePause,
     /// Run the client with `--reauth`; it opens the browser and waits for the sign-in.
     SignIn,
-    /// Close the flyout: the surface lost keyboard focus, which is how "click outside" reaches us.
-    Hide,
+    /// A surface lost keyboard focus. For the flyout that is how "click outside" reaches us.
+    Unfocused(IcedId),
+    OpenSettings,
+    ShowPage(Page),
+    /// The compositor closed a window; only the settings window matters.
+    WindowClosed(IcedId),
+    SetAutostart(bool),
+    SetNotifyPaused(bool),
+    EmailChanged(String),
+    /// Ask Microsoft for the tenant behind the typed address.
+    LookUpTitle,
+    TitleFound(oxdrive_core::Result<String>),
+    SelectProfile(String),
+    OpenUrl(&'static str),
+}
+
+/// One row of the flyout's recent activity.
+pub struct Activity {
+    pub name: String,
+    /// `Uploaded to` or `Deleted from`.
+    pub action: &'static str,
+    pub folder: String,
+    pub at: Instant,
 }
 
 pub struct App {
@@ -47,11 +74,24 @@ pub struct App {
     /// The flyout header: `OneDrive - <tenant>` once the address is known, else `OneDrive`.
     pub title: String,
     pub account: String,
-    pub recent: Vec<String>,
+    pub recent: Vec<Activity>,
     /// Shown under the headline when the client has something to say.
     pub detail: Option<String>,
     profile: Option<Profile>,
+    profiles: Vec<Profile>,
+    settings: Settings,
     flyout: Option<IcedId>,
+    settings_window: Option<IcedId>,
+    pub page: Page,
+    /// What went wrong on the settings page, if anything.
+    pub notice: Option<String>,
+    pub autostart: bool,
+    /// The sign-in address as typed, saved once a lookup succeeds.
+    pub email: String,
+    pub free_space: Option<u64>,
+    /// `(used, total)` from `--display-quota`, for the storage bar.
+    pub quota: Option<(u64, u64)>,
+    pub client_version: String,
     /// Where the icon was last clicked, so the flyout can open without a click after a sign-in.
     icon_x: i32,
     /// Dropping the handle removes the icon, so it lives as long as the app.
@@ -62,6 +102,36 @@ pub struct App {
 }
 
 impl App {
+    pub fn notify_when_paused(&self) -> bool {
+        self.settings.notify_when_paused
+    }
+
+    fn save_settings(&mut self) {
+        self.notice = oxdrive_native::settings::save(&self.settings).err();
+    }
+
+    /// Switches to a named profile: title, address, and a fresh client.
+    fn select_profile(&mut self, name: &str) {
+        let Some(profile) = self.profiles.iter().find(|p| p.name == name).cloned() else {
+            return;
+        };
+        self.title = self.settings.title(name);
+        self.email = self
+            .settings
+            .accounts
+            .get(name)
+            .map(|a| a.email.clone())
+            .unwrap_or_default();
+        self.account = profile.name.clone();
+        self.recent.clear();
+        self.free_space = None;
+        self.quota = None;
+        self.profile = Some(profile);
+        self.settings.profile = Some(name.to_owned());
+        self.save_settings();
+        self.start_client(false, SyncState::Syncing);
+    }
+
     /// Changes the sync state everywhere it shows: the flyout and the tray icon.
     pub fn set_state(&mut self, state: SyncState) {
         self.state = state;
@@ -70,20 +140,34 @@ impl App {
         }
     }
 
-    fn push_recent(&mut self, row: String) {
-        self.recent.insert(0, row);
+    fn push_recent(&mut self, action: &'static str, path: &str) {
+        let (folder, name) = folder_and_name(path);
+        self.recent.insert(
+            0,
+            Activity {
+                name: name.to_owned(),
+                action,
+                folder: folder.to_owned(),
+                at: Instant::now(),
+            },
+        );
         self.recent.truncate(RECENT_MAX);
     }
 
     /// Starts a client for the current profile; dropping any old handle stops it first.
     fn start_client(&mut self, reauth: bool, state: SyncState) {
-        let Some(profile) = &self.profile else { return };
+        let Some(profile) = self.profile.clone() else {
+            return;
+        };
         self.client = None;
         match client::spawn(&profile.config_dir, reauth, self.client_tx.clone()) {
             Ok(handle) => {
                 self.client = Some(handle);
                 self.detail = None;
                 self.set_state(state);
+                if !reauth {
+                    client::quota(&profile.config_dir, self.client_tx.clone());
+                }
             }
             Err(why) => {
                 self.detail = Some(why);
@@ -98,6 +182,9 @@ impl App {
             self.start_client(false, SyncState::Syncing);
         } else if self.client.take().is_some() {
             self.set_state(SyncState::Paused);
+            if self.settings.notify_when_paused {
+                desktop::notify("OneDrive", SyncState::Paused.headline());
+            }
         }
     }
 
@@ -112,8 +199,8 @@ impl App {
         match event {
             ClientEvent::Event(event) => {
                 match &event {
-                    Event::Uploaded(name) => self.push_recent(format!("Uploaded {name}")),
-                    Event::Deleted(name) => self.push_recent(format!("Deleted {name}")),
+                    Event::Uploaded(path) => self.push_recent("Uploaded to", path),
+                    Event::Deleted(path) => self.push_recent("Deleted from", path),
                     Event::AuthRequired => {
                         self.detail =
                             Some("Your sign-in expired. Sign in again to continue syncing.".into());
@@ -122,10 +209,14 @@ impl App {
                         self.detail = Some("Finish signing in in your browser.".into());
                     }
                     Event::SyncStarted => self.detail = None,
-                    Event::SyncComplete
-                    | Event::FreeSpace(_)
-                    | Event::AccountType(_)
-                    | Event::ShuttingDown => {}
+                    Event::FreeSpace(bytes) => self.free_space = Some(*bytes),
+                    Event::UsedSpace(used) => {
+                        self.quota = Some((*used, self.quota.map_or(0, |(_, total)| total)));
+                    }
+                    Event::TotalSpace(total) => {
+                        self.quota = Some((self.quota.map_or(0, |(used, _)| used), *total));
+                    }
+                    Event::SyncComplete | Event::AccountType(_) | Event::ShuttingDown => {}
                 }
                 if let Some(state) = event.state() {
                     self.set_state(state);
@@ -138,6 +229,9 @@ impl App {
                     self.set_state(SyncState::Disabled);
                 }
             }
+        }
+        if signed_in && let Some(profile) = &self.profile {
+            client::quota(&profile.config_dir, self.client_tx.clone());
         }
         signed_in
     }
@@ -182,10 +276,16 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.icon_x = x;
             open_flyout(app, x)
         }
-        Message::Tray(TrayEvent::Activate { .. }) | Message::Hide => match app.flyout.take() {
+        Message::Tray(TrayEvent::Activate { .. }) => match app.flyout.take() {
             Some(id) => Task::done(Message::RemoveWindow(id)),
             None => Task::none(),
         },
+        // Only the flyout closes on blur; the settings window losing focus is just a window.
+        Message::Unfocused(id) if app.flyout == Some(id) => {
+            app.flyout = None;
+            Task::done(Message::RemoveWindow(id))
+        }
+        Message::Unfocused(_) => Task::none(),
         Message::Tray(TrayEvent::Quit) => {
             // Drop first: the handle sends SIGTERM so the client checkpoints on its way out.
             app.client = None;
@@ -207,12 +307,95 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
                 Task::none()
             }
         }
+        Message::Tray(TrayEvent::Settings) | Message::OpenSettings => {
+            // An open window cannot be raised from here (see platform.md); it stays where it is.
+            if app.settings_window.is_some() {
+                return Task::none();
+            }
+            let id = IcedId::unique();
+            app.settings_window = Some(id);
+            app.notice = None;
+            Task::done(Message::NewBaseWindow {
+                id,
+                settings: IcedXdgWindowSettings {
+                    size: Some(theme::SETTINGS_SIZE),
+                    client_side_decorations: false,
+                },
+            })
+        }
+        Message::ShowPage(page) => {
+            app.page = page;
+            app.notice = None;
+            Task::none()
+        }
+        Message::WindowClosed(id) => {
+            if app.settings_window == Some(id) {
+                app.settings_window = None;
+            }
+            Task::none()
+        }
+        Message::SetAutostart(on) => {
+            match autostart::set(on) {
+                Ok(()) => app.autostart = on,
+                Err(why) => app.notice = Some(why),
+            }
+            Task::none()
+        }
+        Message::SetNotifyPaused(on) => {
+            app.settings.notify_when_paused = on;
+            app.save_settings();
+            Task::none()
+        }
+        Message::EmailChanged(email) => {
+            app.email = email;
+            Task::none()
+        }
+        Message::LookUpTitle => {
+            let email = app.email.trim().to_owned();
+            if !email.contains('@') {
+                app.notice = Some("Type the address you sign in with.".into());
+                return Task::none();
+            }
+            app.notice = Some("Asking Microsoft...".into());
+            // ponytail: the lookup blocks one thread of iced's pool for up to ten seconds; a
+            // dedicated thread and channel if the pool ever matters
+            Task::perform(
+                futures::future::lazy(move |_| realm::lookup(&email)),
+                Message::TitleFound,
+            )
+        }
+        Message::TitleFound(Ok(title)) => {
+            if let Some(name) = app.profile.as_ref().map(|p| p.name.clone()) {
+                let account = app.settings.accounts.entry(name).or_default();
+                account.email = app.email.trim().to_owned();
+                account.title = Some(title.clone());
+                app.save_settings();
+            }
+            app.title = title;
+            Task::none()
+        }
+        Message::TitleFound(Err(why)) => {
+            app.notice = Some(why);
+            Task::none()
+        }
+        Message::SelectProfile(name) => {
+            app.select_profile(&name);
+            Task::none()
+        }
+        Message::OpenUrl(url) => {
+            desktop::open(url);
+            Task::none()
+        }
         _ => Task::none(),
     }
 }
 
-fn view(app: &App, _id: IcedId) -> Element<'_, Message> {
-    flyout::view(app)
+fn view(app: &App, id: IcedId) -> Element<'_, Message> {
+    if app.settings_window == Some(id) {
+        settings::view(app)
+    } else {
+        flyout::view(app)
+    }
 }
 
 fn subscription(_: &App) -> Subscription<Message> {
@@ -220,8 +403,9 @@ fn subscription(_: &App) -> Subscription<Message> {
         Subscription::run(tray_events),
         Subscription::run(client_events),
         // The flyout takes keyboard focus on demand; a click anywhere else takes it away.
-        iced::event::listen_with(|event, _, _| match event {
-            iced::Event::Window(iced::window::Event::Unfocused) => Some(Message::Hide),
+        iced::event::listen_with(|event, _, id| match event {
+            iced::Event::Window(iced::window::Event::Unfocused) => Some(Message::Unfocused(id)),
+            iced::Event::Window(iced::window::Event::Closed) => Some(Message::WindowClosed(id)),
             _ => None,
         }),
     ])
@@ -259,8 +443,14 @@ pub fn run() -> oxdrive_core::Result<()> {
     // The boot closure must be `Fn`, so the handle is handed over through an Option.
     tray::quit_on_signal(tx.clone())?;
     let tray = Mutex::new(Some(tray::spawn(tx)?));
-    // ponytail: first profile only; a profile switcher comes with settings
-    let profile = client::profiles().into_iter().next();
+    let settings = oxdrive_native::settings::load();
+    let profiles = client::profiles();
+    let profile = settings
+        .profile
+        .as_deref()
+        .and_then(|name| profiles.iter().find(|p| p.name == name))
+        .or_else(|| profiles.first())
+        .cloned();
     let (client_tx, client_rx) = mpsc::unbounded();
     *CLIENT_RX.lock().unwrap_or_else(PoisonError::into_inner) = Some(client_rx);
     let (client, state, detail) = match &profile {
@@ -278,15 +468,32 @@ pub fn run() -> oxdrive_core::Result<()> {
     let account = profile
         .as_ref()
         .map_or_else(|| "Not signed in".into(), |p| p.name.clone());
-    // ponytail: OXDRIVE_EMAIL is a test hook until settings hold the sign-in address; the lookup
-    // blocks startup for up to ten seconds when Microsoft is slow
-    let title = std::env::var("OXDRIVE_EMAIL")
-        .ok()
-        .and_then(|email| realm::lookup(&email).ok())
-        .unwrap_or_else(|| "OneDrive".into());
+    let (title, email) = profile.as_ref().map_or_else(
+        || ("OneDrive".to_owned(), String::new()),
+        |p| {
+            let email = settings
+                .accounts
+                .get(&p.name)
+                .map(|a| a.email.clone())
+                .unwrap_or_default();
+            (settings.title(&p.name), email)
+        },
+    );
+    let autostart = autostart::enabled();
+    let client_version = client::version().unwrap_or_else(|| "not installed".into());
     let boot = move || App {
         state,
         title: title.clone(),
+        profiles: profiles.clone(),
+        settings: settings.clone(),
+        settings_window: None,
+        page: Page::default(),
+        notice: None,
+        autostart,
+        email: email.clone(),
+        free_space: None,
+        quota: None,
+        client_version: client_version.clone(),
         account: account.clone(),
         recent: Vec::new(),
         detail: detail.clone(),
@@ -299,8 +506,11 @@ pub fn run() -> oxdrive_core::Result<()> {
     };
     iced_layershell::daemon(boot, tray::APP_ID, update, view)
         .subscription(subscription)
+        .title(|app: &App, id: IcedId| {
+            (app.settings_window == Some(id)).then(|| "OneDrive Settings".to_owned())
+        })
         .theme(|_: &App, _: IcedId| theme::theme())
-        .settings(Settings {
+        .settings(DaemonSettings {
             layer_settings: LayerShellSettings {
                 start_mode: StartMode::Background,
                 ..Default::default()

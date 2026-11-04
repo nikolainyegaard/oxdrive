@@ -17,6 +17,7 @@ pub enum TrayEvent {
     },
     /// "Pause syncing" or "Resume syncing", whichever the menu showed.
     TogglePause,
+    Settings,
     Quit,
 }
 
@@ -65,6 +66,15 @@ impl ksni::Tray for Tray {
                 enabled: paused || self.state != SyncState::Disabled,
                 activate: Box::new(|tray: &mut Self| {
                     let _ = tray.events.unbounded_send(TrayEvent::TogglePause);
+                }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: "Settings".into(),
+                icon_name: "configure".into(),
+                activate: Box::new(|tray: &mut Self| {
+                    let _ = tray.events.unbounded_send(TrayEvent::Settings);
                 }),
                 ..Default::default()
             }

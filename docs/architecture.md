@@ -13,16 +13,21 @@ oxdrive/
 │   ├── src/client.rs       # line parser: client stdout to Event, fixture tested
 │   ├── src/profiles.rs     # OneDriveGUI profiles file: name and config dir per account
 │   ├── src/realm.rs        # home realm discovery reply to the flyout title; see client.md
+│   ├── src/settings.rs     # our settings file: preferences and per-profile account facts
 │   ├── src/status.rs       # SyncState: the seven tray states and their copy
 │   └── tests/fixtures/     # real client output, scrubbed; see client.md
 ├── crates/native/          # everything that touches the OS
+│   ├── src/autostart.rs    # the XDG autostart desktop file
 │   ├── src/client.rs       # spawns onedrive --monitor, reads its output on two threads
+│   ├── src/desktop.rs      # xdg-open and notify-send
 │   ├── src/realm.rs        # asks Microsoft for the tenant name through curl
+│   ├── src/settings.rs     # reads and writes ~/.config/oxdrive/settings
 │   ├── examples/realm.rs   # prints the title for an address
 │   └── src/tray.rs         # StatusNotifierItem through ksni, on its own thread
 ├── crates/ui/              # iced views, theme, the layer-shell daemon
 │   ├── src/lib.rs          # App state, Message, update, the tray channel bridge, run()
 │   ├── src/flyout.rs       # the flyout view
+│   ├── src/settings.rs     # the settings window: sidebar, four pages
 │   └── src/theme.rs        # design tokens
 ├── assets/                 # our own icons, when drawn
 └── docs/
@@ -43,6 +48,8 @@ Pause drops the `ClientHandle` (SIGTERM, reaped on a thread) and sets Paused; re
 Sign in reruns the client with `--reauth` through the same `start_client` path as resume, with the state set to Blocked. The client opens the browser and waits on its own loopback listener; the parser turns its "Opening the Microsoft authorisation URL" line into `SignInOpened`, which keeps Blocked and sets the detail line, and the first `SyncStarted` clears it and opens the flyout at the last click position, as the Windows client does. oxdrive never sees the URL or the code.
 
 Quit drops the `ClientHandle` before `iced::exit`; the drop sends SIGTERM through `kill` and hands the `Child` to a reaper thread, so the UI never waits. The client finishes its checkpoint on its own, even after oxdrive has exited. The client runs with `--disable-notifications`: oxdrive owns what the desktop shows.
+
+The settings window is an xdg toplevel opened with `Message::NewBaseWindow` from the flyout's Settings button or the tray menu; `view` picks the settings view for that window id and the flyout for everything else, and the daemon's title callback names it. The compositor closes it, which arrives as a `Window::Closed` event with the id. Settings changes are saved on every toggle; the tenant lookup runs on iced's thread pool through `Task::perform` so the UI thread never waits on the network, and its result is written to the profile's section.
 
 The tenant name for the title comes from one `curl` call to Microsoft's home realm discovery, not from the client and not from an HTTP crate: `native::realm::lookup` runs the process, `core::realm::title` reads the one field that matters. It runs once per sign-in address and the result belongs in the profile.
 

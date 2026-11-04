@@ -12,6 +12,9 @@ pub enum Event {
     Deleted(String),
     /// Bytes remaining, from the start-up block or from `--display-quota`.
     FreeSpace(u64),
+    /// `Total:` and `Used:` from `--display-quota`, in bytes.
+    TotalSpace(u64),
+    UsedSpace(u64),
     /// `business` or `personal`, as printed.
     AccountType(String),
     /// The client wants `--reauth` and will exit.
@@ -29,9 +32,12 @@ impl Event {
             Self::SyncComplete => Some(SyncState::Idle),
             Self::AuthRequired | Self::SignInOpened => Some(SyncState::Blocked),
             Self::ShuttingDown => Some(SyncState::Disabled),
-            Self::Uploaded(_) | Self::Deleted(_) | Self::FreeSpace(_) | Self::AccountType(_) => {
-                None
-            }
+            Self::Uploaded(_)
+            | Self::Deleted(_)
+            | Self::FreeSpace(_)
+            | Self::TotalSpace(_)
+            | Self::UsedSpace(_)
+            | Self::AccountType(_) => None,
         }
     }
 }
@@ -58,6 +64,12 @@ pub fn parse_line(line: &str) -> Option<Event> {
     {
         return bytes_in_brackets(rest).map(Event::FreeSpace);
     }
+    if let Some(rest) = line.strip_prefix("Total:") {
+        return bytes_in_brackets(rest).map(Event::TotalSpace);
+    }
+    if let Some(rest) = line.strip_prefix("Used:") {
+        return bytes_in_brackets(rest).map(Event::UsedSpace);
+    }
     if let Some(rest) = line.strip_prefix("Account Type:") {
         return Some(Event::AccountType(rest.trim().to_owned()));
     }
@@ -71,6 +83,17 @@ pub fn parse_line(line: &str) -> Option<Event> {
         return Some(Event::ShuttingDown);
     }
     None
+}
+
+/// Splits a path the client printed into the folder the flyout names and the file name.
+/// Files in the sync root belong to `OneDrive`.
+#[must_use]
+pub fn folder_and_name(path: &str) -> (&str, &str) {
+    let path = path.strip_prefix("./").unwrap_or(path);
+    match path.rsplit_once('/') {
+        Some((folder, name)) => (folder.rsplit('/').next().unwrap_or(folder), name),
+        None => ("OneDrive", path),
+    }
 }
 
 /// The number in a trailing `(<n> bytes)`.
@@ -121,13 +144,33 @@ mod tests {
     #[test]
     fn display_quota_gives_free_space() {
         let got = events(include_str!("../tests/fixtures/display-quota.txt"));
-        assert_eq!(got, vec![Event::FreeSpace(981_377_796_762)]);
+        assert_eq!(
+            got,
+            vec![
+                Event::FreeSpace(981_377_796_762),
+                Event::TotalSpace(1_099_511_627_776),
+                Event::UsedSpace(117_227_812_949),
+            ]
+        );
     }
 
     #[test]
     fn sync_status_and_config_are_silent() {
         assert!(events(include_str!("../tests/fixtures/display-sync-status.txt")).is_empty());
         assert!(events(include_str!("../tests/fixtures/display-config.txt")).is_empty());
+    }
+
+    #[test]
+    fn paths_split_into_folder_and_name() {
+        assert_eq!(folder_and_name("a.txt"), ("OneDrive", "a.txt"));
+        assert_eq!(
+            folder_and_name("./Screenshots/a.png"),
+            ("Screenshots", "a.png")
+        );
+        assert_eq!(
+            folder_and_name("Work/Reports/q3.xlsx"),
+            ("Reports", "q3.xlsx")
+        );
     }
 
     #[test]
