@@ -24,6 +24,8 @@ pub enum TrayEvent {
 pub struct Tray {
     state: SyncState,
     events: UnboundedSender<TrayEvent>,
+    /// Root of our icon theme, announced as `IconThemePath`; `None` means theme icon names.
+    theme: Option<std::path::PathBuf>,
 }
 
 impl ksni::Tray for Tray {
@@ -34,7 +36,17 @@ impl ksni::Tray for Tray {
         "OneDrive".into()
     }
     fn icon_name(&self) -> String {
-        self.state.icon_name().into()
+        if self.theme.is_some() {
+            format!("{APP_ID}-{}", self.state.slug())
+        } else {
+            self.state.icon_name().into()
+        }
+    }
+    fn icon_theme_path(&self) -> String {
+        self.theme
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default()
     }
     fn tool_tip(&self) -> ksni::ToolTip {
         ksni::ToolTip {
@@ -127,6 +139,7 @@ pub fn spawn(events: UnboundedSender<TrayEvent>) -> oxdrive_core::Result<TrayHan
     Tray {
         state: SyncState::Idle,
         events,
+        theme: crate::icons::install(),
     }
     .spawn()
     .map(TrayHandle)

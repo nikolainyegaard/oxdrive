@@ -86,7 +86,7 @@ pub fn close() {
     let _ = std::fs::remove_file(pid_file);
 }
 
-fn runtime_dir() -> oxdrive_core::Result<PathBuf> {
+pub(crate) fn runtime_dir() -> oxdrive_core::Result<PathBuf> {
     let base = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| Path::new(&h).join(".cache")))

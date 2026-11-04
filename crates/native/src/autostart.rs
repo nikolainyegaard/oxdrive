@@ -32,7 +32,7 @@ pub fn set(on: bool) -> oxdrive_core::Result<()> {
     }
     let exe = std::env::current_exe().map_err(|e| format!("could not find this binary: {e}"))?;
     let entry = format!(
-        "[Desktop Entry]\nType=Application\nName=OneDrive\nComment=Keeps your OneDrive in sync\nExec={}\nIcon=folder-cloud\nTerminal=false\n",
+        "[Desktop Entry]\nType=Application\nName=OneDrive\nComment=Keeps your OneDrive in sync\nExec={}\nIcon=oxdrive\nTerminal=false\n",
         exe.display()
     );
     if let Some(dir) = path.parent() {

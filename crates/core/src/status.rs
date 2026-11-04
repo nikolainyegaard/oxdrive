@@ -26,7 +26,30 @@ impl SyncState {
         }
     }
 
-    /// Icon theme name used until the project ships its own tray icons.
+    pub const ALL: [Self; 7] = [
+        Self::Idle,
+        Self::Syncing,
+        Self::Paused,
+        Self::Warning,
+        Self::Error,
+        Self::Blocked,
+        Self::Disabled,
+    ];
+
+    /// The lowercase name: file stems under `assets/tray/` and the `tray-<slug>` override.
+    pub fn slug(self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Syncing => "syncing",
+            Self::Paused => "paused",
+            Self::Warning => "warning",
+            Self::Error => "error",
+            Self::Blocked => "blocked",
+            Self::Disabled => "disabled",
+        }
+    }
+
+    /// Icon theme name, the fallback when our own tray icons could not be installed.
     pub fn icon_name(self) -> &'static str {
         match self {
             Self::Idle => "folder-cloud",
@@ -113,17 +136,10 @@ mod tests {
 
     #[test]
     fn every_state_has_user_facing_copy() {
-        for state in [
-            SyncState::Idle,
-            SyncState::Syncing,
-            SyncState::Paused,
-            SyncState::Warning,
-            SyncState::Error,
-            SyncState::Blocked,
-            SyncState::Disabled,
-        ] {
+        for state in SyncState::ALL {
             assert!(!state.headline().is_empty());
             assert!(!state.icon_name().is_empty());
+            assert!(!state.slug().is_empty());
         }
     }
 }

@@ -18,6 +18,7 @@ oxdrive/
 │   └── tests/fixtures/     # real client output, scrubbed; see client.md
 ├── crates/native/          # everything that touches the OS
 │   ├── src/autostart.rs    # the XDG autostart desktop file
+│   ├── src/icons.rs        # the icon override directory; installs the tray theme, app icon and desktop entry
 │   ├── src/client.rs       # spawns onedrive --monitor, reads its output on two threads
 │   ├── src/desktop.rs      # xdg-open and notify-send
 │   ├── src/popup.rs        # the sign-in popup: xdg-open shim and a Chromium app window

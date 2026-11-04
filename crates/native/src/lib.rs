@@ -3,6 +3,7 @@
 pub mod autostart;
 pub mod client;
 pub mod desktop;
+pub mod icons;
 pub mod popup;
 pub mod realm;
 pub mod settings;

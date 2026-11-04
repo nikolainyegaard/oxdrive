@@ -17,14 +17,6 @@ fn path() -> Option<PathBuf> {
     Some(config_dir()?.join("settings"))
 }
 
-/// `icons/<name>.svg` under the config directory, when the user has put one there to replace
-/// the built-in icon of that name.
-#[must_use]
-pub fn custom_icon(name: &str) -> Option<PathBuf> {
-    let path = config_dir()?.join("icons").join(format!("{name}.svg"));
-    path.is_file().then_some(path)
-}
-
 /// The saved settings, or the defaults when there is no file yet.
 #[must_use]
 pub fn load() -> Settings {

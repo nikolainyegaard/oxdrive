@@ -73,7 +73,7 @@ impl Icon {
     fn handle(self) -> Handle {
         // ponytail: one stat per icon per view to honour a dropped-in override; cache the
         // lookup if the flyout ever redraws often enough for it to show.
-        match oxdrive_native::settings::custom_icon(self.name()) {
+        match oxdrive_native::icons::custom(self.name()) {
             Some(path) => Handle::from_path(path),
             None => Handle::from_memory(self.bytes()),
         }

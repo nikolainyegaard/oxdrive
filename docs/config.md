@@ -17,6 +17,6 @@ Top-level keys are the preferences; one section per profile holds the sign-in ad
 
 - XDG base directories under the app name: `~/.config/oxdrive/` for settings and the profile list, `~/.local/state/oxdrive/` for logs. Directories created with owner-only permissions, files written through a temp file and a rename.
 - A profile is a name, the path of a client config directory, and the sign-in address, which gives the flyout its `OneDrive - <tenant>` title through `core::realm` (see client.md). The first import reads OneDriveGUI's `~/.config/onedrive-gui/profiles` so an existing setup carries over.
-- Icons: drop `<name>.svg` into `~/.config/oxdrive/icons/` to replace a built-in one, names as in design.md. No key, no restart: the file is checked each time a view is drawn.
+- Icons: drop `<name>.svg` into `~/.config/oxdrive/icons/` to replace a built-in one. `app.svg` is the app icon, `tray-idle.svg`, `tray-syncing.svg`, `tray-paused.svg`, `tray-warning.svg`, `tray-error.svg`, `tray-blocked.svg` and `tray-disabled.svg` the tray states, the rest are the in-app glyphs named in design.md. No key. The tray and app icons are read at start, the in-app glyphs each time a view is drawn. This is how to put the official OneDrive set in place; oxdrive ships none of it.
 - No environment variables for user settings.
 - Secrets stay with the client; oxdrive stores none.

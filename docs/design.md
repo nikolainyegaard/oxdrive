@@ -41,7 +41,7 @@ All in `crates/ui/src/theme.rs`. Views name a token, never a colour or size.
 | Blocked | Sign in to sync | dialog-password |
 | Disabled | OneDrive isn't running | folder-cloud |
 
-The seven states are the Windows set. Our icons: seven SVGs under `assets/tray/`, one cloud silhouette with a badge per state, drawn by us. The Microsoft set is reference only.
+The seven states are the Windows set. Our icons: seven SVGs under `assets/tray/`, a white cloud silhouette on a 22 px grid with a badge at the bottom right per state (green check, blue arrows, grey pause, yellow exclamation, red cross, red lock), the disabled cloud at half opacity with no badge. `assets/app.svg` is the same cloud filled blue: the app icon for the window header, the task bar and the launcher. The Microsoft set is reference only; a user who wants it drops it into the override directory (config.md).
 
 ## Flyout layout
 
@@ -60,7 +60,7 @@ Fifteen SVGs under `assets/icons/`, drawn by us: 20 x 20 viewBox, 1.5 px white s
 | file | Activity row |
 | folder, globe, play | Footer buttons |
 
-The tray icon still names theme icons (`SyncState::icon_name`); our own tray set is a separate slice.
+The tray icons travel as files: `native::icons::install` lays them out as a `hicolor` theme under `$XDG_RUNTIME_DIR/oxdrive/icons/`, which the tray announces as `IconThemePath`, with the icon names `oxdrive-<state>`. When that fails, the tray falls back to theme icon names (`SyncState::icon_name`). The app icon also goes to `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is how Plasma finds the icon for windows with the app id `oxdrive`.
 
 ## Settings window
 
