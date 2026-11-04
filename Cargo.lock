@@ -2446,6 +2446,7 @@ dependencies = [
  "futures",
  "ksni",
  "oxdrive-core",
+ "resvg",
  "signal-hook",
 ]
 

@@ -24,8 +24,8 @@ pub enum TrayEvent {
 pub struct Tray {
     state: SyncState,
     events: UnboundedSender<TrayEvent>,
-    /// Root of our icon theme, announced as `IconThemePath`; `None` means theme icon names.
-    theme: Option<std::path::PathBuf>,
+    /// Rasterised at start, one entry per state. Empty means theme icon names.
+    pixmaps: Vec<(SyncState, Vec<ksni::Icon>)>,
 }
 
 impl ksni::Tray for Tray {
@@ -36,16 +36,17 @@ impl ksni::Tray for Tray {
         "OneDrive".into()
     }
     fn icon_name(&self) -> String {
-        if self.theme.is_some() {
-            format!("{APP_ID}-{}", self.state.slug())
-        } else {
+        if self.pixmaps.is_empty() {
             self.state.icon_name().into()
+        } else {
+            String::new()
         }
     }
-    fn icon_theme_path(&self) -> String {
-        self.theme
-            .as_ref()
-            .map(|p| p.display().to_string())
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        self.pixmaps
+            .iter()
+            .find(|(state, _)| *state == self.state)
+            .map(|(_, icons)| icons.clone())
             .unwrap_or_default()
     }
     fn tool_tip(&self) -> ksni::ToolTip {
@@ -139,7 +140,14 @@ pub fn spawn(events: UnboundedSender<TrayEvent>) -> oxdrive_core::Result<TrayHan
     Tray {
         state: SyncState::Idle,
         events,
-        theme: crate::icons::install(),
+        pixmaps: {
+            crate::icons::install();
+            SyncState::ALL
+                .into_iter()
+                .map(|state| (state, crate::icons::tray_pixmaps(state)))
+                .filter(|(_, icons)| !icons.is_empty())
+                .collect()
+        },
     }
     .spawn()
     .map(TrayHandle)

@@ -60,7 +60,7 @@ Fifteen SVGs under `assets/icons/`, drawn by us: 20 x 20 viewBox, 1.5 px white s
 | file | Activity row |
 | folder, globe, play | Footer buttons |
 
-The tray icons travel as files: `native::icons::install` lays them out as a `hicolor` theme under `$XDG_RUNTIME_DIR/oxdrive/icons/`, which the tray announces as `IconThemePath`, with the icon names `oxdrive-<state>`. When that fails, the tray falls back to theme icon names (`SyncState::icon_name`). The app icon also goes to `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is how Plasma finds the icon for windows with the app id `oxdrive`.
+The tray icons travel as pixmaps: `native::icons::tray_pixmaps` rasterises each state's SVG with resvg at 22 and 44 px into ARGB32 and the tray serves them as `IconPixmap`. `IconThemePath` was tried first, flat and in `hicolor/` layout; Plasma 6 showed the unknown-icon placeholder for both (2026-11-04), and pixmaps are what every host honours. When an SVG does not parse the tray falls back to theme icon names (`SyncState::icon_name`). The app icon goes to `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is how Plasma finds the icon for windows with the app id `oxdrive`.
 
 ## Settings window
 

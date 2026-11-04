@@ -18,7 +18,7 @@ oxdrive/
 │   └── tests/fixtures/     # real client output, scrubbed; see client.md
 ├── crates/native/          # everything that touches the OS
 │   ├── src/autostart.rs    # the XDG autostart desktop file
-│   ├── src/icons.rs        # the icon override directory; installs the tray theme, app icon and desktop entry
+│   ├── src/icons.rs        # the icon override directory; tray pixmaps, app icon and desktop entry
 │   ├── src/client.rs       # spawns onedrive --monitor, reads its output on two threads
 │   ├── src/desktop.rs      # xdg-open and notify-send
 │   ├── src/popup.rs        # the sign-in popup: xdg-open shim and a Chromium app window
@@ -67,4 +67,5 @@ One line each. A new direct dependency gets a row here in the same change.
 | ksni 0.3 | Pure Rust StatusNotifierItem over D-Bus. Features `blocking` and `async-io`; no tokio. |
 | futures 0.3 | The channel between the tray thread and the iced subscription, and stream adapters. |
 | signal-hook 0.3 | Safe SIGTERM/SIGINT/SIGHUP handling without `unsafe` in our code; a signal becomes a Quit so the client is stopped too. Feature `iterator` only. |
+| resvg 0.45 | Rasterises our tray SVGs into the pixmaps the StatusNotifierItem carries; already in the build through iced's `svg` feature, so no new code is linked. No features. |
 | winit-core =0.31.0-beta.2 | Pin only, see gotchas.md. Not used directly. |
