@@ -33,9 +33,44 @@ pub fn parse(text: &str) -> Vec<Profile> {
     profiles
 }
 
+/// The `sync_dir` from the client's `config` text: unquoted, `~` expanded, defaulting to
+/// `~/OneDrive` like the client does.
+pub fn sync_dir(config: &str, home: &Path) -> PathBuf {
+    let value = config
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| line.split_once('='))
+        .find(|(key, _)| key.trim() == "sync_dir")
+        .map(|(_, value)| value.trim().trim_matches('"'))
+        .filter(|value| !value.is_empty())
+        .unwrap_or("~/OneDrive");
+    match value.strip_prefix("~/") {
+        Some(rest) => home.join(rest),
+        None => PathBuf::from(value),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sync_dir_is_unquoted_expanded_and_defaulted() {
+        let home = Path::new("/home/user");
+        assert_eq!(
+            sync_dir("sync_dir = \"~/OneDrive_Work\"\n", home),
+            PathBuf::from("/home/user/OneDrive_Work")
+        );
+        assert_eq!(
+            sync_dir(
+                "# sync_dir = \"/x\"\nsync_dir = \"/srv/od\"\ndrive_id = \"b!x\"\n",
+                home
+            ),
+            PathBuf::from("/srv/od")
+        );
+        assert_eq!(sync_dir("", home), PathBuf::from("/home/user/OneDrive"));
+    }
 
     #[test]
     fn reads_onedrive_gui_profiles() {

@@ -58,8 +58,13 @@ pub fn view(app: &App) -> Element<'_, Message> {
     };
     let footer = container(
         row![
-            footer_button(Icon::Folder, "Open folder", None),
-            footer_button(Icon::Globe, "View online", None),
+            footer_button(Icon::Folder, "Open folder", Some(Message::OpenFolder)),
+            // ponytail: the launcher redirects to the account's own drive; per-drive URLs need drive_id
+            footer_button(
+                Icon::Globe,
+                "View online",
+                Some(Message::OpenUrl("https://www.office.com/launch/onedrive")),
+            ),
             footer_button(action_icon, action_label, Some(action)),
         ]
         .spacing(theme::GAP),

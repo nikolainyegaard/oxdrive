@@ -67,6 +67,8 @@ pub enum Message {
     TitleFound(oxdrive_core::Result<String>),
     SelectProfile(String),
     OpenUrl(&'static str),
+    /// The profile's sync folder in the file manager.
+    OpenFolder,
     /// Open the file dialog for one icon slot.
     PickIcon(usize),
     IconPicked(usize, Option<PathBuf>),
@@ -464,6 +466,12 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
         }
         Message::OpenUrl(url) => {
             desktop::open(url);
+            Task::none()
+        }
+        Message::OpenFolder => {
+            if let Some(profile) = &app.profile {
+                desktop::open(&client::sync_dir(profile).to_string_lossy());
+            }
             Task::none()
         }
         _ => Task::none(),

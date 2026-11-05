@@ -141,6 +141,16 @@ pub fn profiles() -> Vec<Profile> {
     }
 }
 
+/// The profile's local sync folder, read from its `config` file.
+#[must_use]
+pub fn sync_dir(profile: &Profile) -> PathBuf {
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default();
+    let config = std::fs::read_to_string(profile.config_dir.join("config")).unwrap_or_default();
+    profiles::sync_dir(&config, &home)
+}
+
 /// `onedrive --version` as printed, for the About page.
 #[must_use]
 pub fn version() -> Option<String> {
