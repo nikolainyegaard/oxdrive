@@ -13,12 +13,13 @@ use futures::StreamExt as _;
 use futures::channel::mpsc;
 use futures::stream::BoxStream;
 use iced::{Element, Subscription, Task};
-use iced_layershell::actions::IcedXdgWindowSettings;
-use iced_layershell::reexport::{
-    Anchor, IcedId, KeyboardInteractivity, Layer, NewLayerShellSettings,
+use iced_exwlshell::actions::IcedXdgWindowSettings;
+use iced_exwlshell::reexport::{
+    Anchor, IcedId, KeyboardInteractivity, Layer, LayerSize, Margin, NewLayerShellSettings,
+    PixelSize,
 };
-use iced_layershell::settings::{LayerShellSettings, Settings as DaemonSettings, StartMode};
-use iced_layershell::to_layer_message;
+use iced_exwlshell::settings::{LayerShellSettings, StartMode};
+use iced_exwlshell::to_layer_message;
 use oxdrive_core::client::{Event, folder_and_name};
 use oxdrive_core::profiles::Profile;
 use oxdrive_core::settings::Settings;
@@ -256,24 +257,26 @@ fn open_flyout(app: &mut App, x: i32) -> Task<Message> {
     let id = IcedId::unique();
     app.flyout = Some(id);
     // ponytail: x is global but the margin is per output, so this is right only when the
-    // panel's output sits at x = 0; subtract the output origin once iced_layershell exposes it
+    // panel's output sits at x = 0; subtract the output origin once iced_exwlshell exposes it
+    let margin = |left| Margin {
+        top: 0,
+        right: 0,
+        bottom: theme::FLYOUT_MARGIN,
+        left,
+    };
     let (anchor, margin) = if x > 0 {
         let half = i32::try_from(theme::FLYOUT_SIZE.0 / 2).unwrap_or(0);
-        let left = (x - half).max(theme::FLYOUT_MARGIN);
         (
             Anchor::Bottom | Anchor::Left,
-            (0, 0, theme::FLYOUT_MARGIN, left),
+            margin((x - half).max(theme::FLYOUT_MARGIN)),
         )
     } else {
-        (
-            Anchor::Bottom | Anchor::Right,
-            (0, 0, theme::FLYOUT_MARGIN, 0),
-        )
+        (Anchor::Bottom | Anchor::Right, margin(0))
     };
     Task::done(Message::NewLayerShell {
         id,
         settings: NewLayerShellSettings {
-            size: Some(theme::FLYOUT_SIZE),
+            size: LayerSize::px(theme::FLYOUT_SIZE.0, theme::FLYOUT_SIZE.1),
             layer: Layer::Top,
             anchor,
             margin: Some(margin),
@@ -332,8 +335,13 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::done(Message::NewBaseWindow {
                 id,
                 settings: IcedXdgWindowSettings {
-                    size: Some(theme::SETTINGS_SIZE),
+                    size: Some(PixelSize::px(
+                        theme::SETTINGS_SIZE.0,
+                        theme::SETTINGS_SIZE.1,
+                    )),
                     client_side_decorations: false,
+                    // The desktop finds the window's icon by this name (icons.rs).
+                    app_id: Some(tray::APP_ID.to_owned()),
                 },
             })
         }
@@ -584,17 +592,14 @@ pub fn run() -> oxdrive_core::Result<()> {
         client: client.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client_tx: client_tx.clone(),
     };
-    iced_layershell::daemon(boot, tray::APP_ID, update, view)
+    iced_exwlshell::daemon(boot, tray::APP_ID, update, view)
         .subscription(subscription)
         .title(|app: &App, id: IcedId| {
             (app.settings_window == Some(id)).then(|| "OneDrive Settings".to_owned())
         })
         .theme(|_: &App, _: IcedId| theme::theme())
-        .settings(DaemonSettings {
-            layer_settings: LayerShellSettings {
-                start_mode: StartMode::Background,
-                ..Default::default()
-            },
+        .layer_settings(LayerShellSettings {
+            start_mode: StartMode::Background,
             ..Default::default()
         })
         .run()

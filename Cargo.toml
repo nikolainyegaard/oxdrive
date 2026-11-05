@@ -14,7 +14,7 @@ oxdrive-core = { path = "crates/core" }
 oxdrive-native = { path = "crates/native" }
 oxdrive-ui = { path = "crates/ui" }
 iced = { version = "0.14", default-features = false, features = ["wgpu", "wayland", "thread-pool", "svg"] }
-iced_layershell = "0.19"
+iced_exwlshell = "0.21"
 ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
 futures = "0.3"
 signal-hook = { version = "0.3", default-features = false, features = ["iterator"] }

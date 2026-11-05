@@ -63,9 +63,8 @@ One line each. A new direct dependency gets a row here in the same change.
 | Crate | Why |
 |-------|-----|
 | iced 0.14 | The UI toolkit. Features `wgpu`, `wayland`, `thread-pool`, and `svg` for the in-app icons (resvg; about 2 MB of binary, measured 2026-11-04). |
-| iced_layershell 0.19 | wlr-layer-shell surfaces for iced, which is what makes an anchored flyout possible on Wayland. |
+| iced_exwlshell 0.21 | wlr-layer-shell surfaces and xdg windows for iced, which is what makes an anchored flyout possible on Wayland. Successor of iced_layershell 0.19; 0.21 sets the window's app id, which the desktop needs to find our icon (gotchas.md). |
 | ksni 0.3 | Pure Rust StatusNotifierItem over D-Bus. Features `blocking` and `async-io`; no tokio. |
 | futures 0.3 | The channel between the tray thread and the iced subscription, and stream adapters. |
 | signal-hook 0.3 | Safe SIGTERM/SIGINT/SIGHUP handling without `unsafe` in our code; a signal becomes a Quit so the client is stopped too. Feature `iterator` only. |
 | resvg 0.45 | Rasterises our tray SVGs into the pixmaps the StatusNotifierItem carries; already in the build through iced's `svg` feature, so no new code is linked. No features. |
-| winit-core =0.31.0-beta.2 | Pin only, see gotchas.md. Not used directly. |

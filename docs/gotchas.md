@@ -10,9 +10,9 @@ The fixtures were captured with `2>&1`, so which stream carries the AADSTS and `
 
 `Child::kill` is SIGKILL. The client wants SIGTERM to checkpoint and vacuum its sqlite database (it prints "Received termination signal" and takes a few seconds). Running `kill` is the one-line way to send SIGTERM without a `libc` or `nix` dependency.
 
-## 2026-10-30: winit-core is pinned to 0.31.0-beta.2
+## 2026-11-05: the window icon needs the app id, which iced_layershell 0.19 never set
 
-`iced_exdevtools 0.19.1`, pulled in by `iced_layershell`, fails to compile against `winit-core 0.31.0-beta.4` (a non-exhaustive match on `NativeKeyCode` in its keymap). Cargo picks beta.4 by default. The pin lives in `apps/oxdrive/Cargo.toml` as a direct dependency with an exact version, because that is the only way to force a pre-release. Check the iced_layershell changelog before every `cargo update` and drop the pin once it releases against a stable winit 0.31.
+KWin and GNOME take a Wayland window's icon from the desktop entry whose name matches the window's `app_id`; a window without one gets the generic Wayland icon no matter what sits in the icon theme. layershellev 0.19 called `set_title` on new xdg toplevels but never `set_app_id` (the "oxdrive" class that tools reported was only the binary name KWin falls back to; `getWindowInfo` on the KWin D-Bus interface showed `desktopFile ""`). The project was renamed to exwlshellev / iced_exwlshell in 0.20 and 0.21 added `app_id` to `IcedXdgWindowSettings`, so the settings window now opens with `app_id: Some("oxdrive")`. The upgrade also removed the winit-core pin from 2026-10-30: `iced_exdevtools 0.21` compiles against winit-core 0.31.0-beta.4.
 
 ## 2026-10-30: egui and eframe were tried and rejected
 
@@ -24,7 +24,7 @@ winit 0.30 on Wayland implements `set_visible`, `set_minimized(false)`, `focus_w
 
 ## 2026-10-30: the iced boot closure must be Fn
 
-`iced_layershell::daemon` takes the boot function as `Fn`, so it cannot move the tray handle into `App` directly. The handle goes through a `Mutex<Option<TrayHandle>>` and is taken on first boot. Same trick for the tray receiver: `Subscription::run` wants a function pointer, so the receiver waits in a static.
+`iced_exwlshell::daemon` takes the boot function as `Fn`, so it cannot move the tray handle into `App` directly. The handle goes through a `Mutex<Option<TrayHandle>>` and is taken on first boot. Same trick for the tray receiver: `Subscription::run` wants a function pointer, so the receiver waits in a static.
 
 ## 2026-10-30: a D-Bus Activate carries no activation token
 
