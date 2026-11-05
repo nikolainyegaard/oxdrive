@@ -49,19 +49,21 @@ pub fn called_as_shim() -> bool {
 }
 
 /// Opens the URL as an app window in a profile of its own, so the window is a process we own
-/// and `close` can end it once the sign-in lands. Returns as soon as the browser is started.
+/// and `close` can end it once the sign-in lands. The profile lives in the state directory,
+/// so the Microsoft session survives and a later sign-in is one click, not a full login.
+/// Returns as soon as the browser is started.
 ///
 /// # Errors
 /// No browser, or it could not be started.
 pub fn open(url: &str) -> oxdrive_core::Result<()> {
     let browser = browser().ok_or("no Chromium-family browser for the sign-in popup")?;
     let dir = runtime_dir()?;
+    let profile = crate::settings::state_dir()
+        .ok_or("no state directory for the sign-in popup")?
+        .join("popup-profile");
     let child = Command::new(browser)
         .arg(format!("--app={url}"))
-        .arg(format!(
-            "--user-data-dir={}",
-            dir.join("popup-profile").display()
-        ))
+        .arg(format!("--user-data-dir={}", profile.display()))
         .args([
             "--window-size=480,720",
             "--no-first-run",

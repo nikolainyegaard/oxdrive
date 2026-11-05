@@ -293,6 +293,7 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::Tray(TrayEvent::Activate { x }) if app.flyout.is_none() => {
             app.icon_x = x;
+            oxdrive_native::settings::save_icon_x(x);
             open_flyout(app, x)
         }
         Message::Tray(TrayEvent::Activate { .. }) => match app.flyout.take() {
@@ -595,7 +596,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         detail: detail.clone(),
         profile: profile.clone(),
         flyout: None,
-        icon_x: 0,
+        icon_x: oxdrive_native::settings::load_icon_x(),
         tray: tray.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client: client.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client_tx: client_tx.clone(),

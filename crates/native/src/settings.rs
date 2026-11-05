@@ -45,13 +45,35 @@ pub fn save(settings: &Settings) -> oxdrive_core::Result<()> {
         .map_err(|e| format!("could not save settings: {e}"))
 }
 
-/// `$XDG_STATE_HOME/oxdrive`, else `~/.local/state/oxdrive`: the recent activity per profile.
-fn recent_path(profile: &str) -> Option<PathBuf> {
+/// `$XDG_STATE_HOME/oxdrive`, else `~/.local/state/oxdrive`.
+pub(crate) fn state_dir() -> Option<PathBuf> {
     let dir = std::env::var_os("XDG_STATE_HOME").map_or_else(
         || std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state")),
         |s| Some(PathBuf::from(s)),
     )?;
-    Some(dir.join("oxdrive").join(format!("{profile}.recent")))
+    Some(dir.join("oxdrive"))
+}
+
+/// The recent activity per profile.
+fn recent_path(profile: &str) -> Option<PathBuf> {
+    Some(state_dir()?.join(format!("{profile}.recent")))
+}
+
+/// Where the tray icon was last clicked, so a flyout opened without a click still centres.
+/// 0 when never clicked.
+#[must_use]
+pub fn load_icon_x() -> i32 {
+    state_dir()
+        .and_then(|d| std::fs::read_to_string(d.join("icon.x")).ok())
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+/// Best effort, like the recent list.
+pub fn save_icon_x(x: i32) {
+    let Some(dir) = state_dir() else { return };
+    let _ = std::fs::create_dir_all(&dir)
+        .and_then(|()| std::fs::write(dir.join("icon.x"), x.to_string()));
 }
 
 /// The activity rows saved for a profile, newest first; empty when there is no file yet.
