@@ -24,6 +24,24 @@ pub fn notify(summary: &str, body: &str) {
         .spawn();
 }
 
+/// True while NetworkManager reports the connection as metered (1 = yes, 3 = guessed yes).
+/// False when it is not, unknown, or there is no NetworkManager to ask.
+#[must_use]
+pub fn metered() -> bool {
+    Command::new("busctl")
+        .args([
+            "get-property",
+            "org.freedesktop.NetworkManager",
+            "/org/freedesktop/NetworkManager",
+            "org.freedesktop.NetworkManager",
+            "Metered",
+        ])
+        .output()
+        .ok()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+        .is_some_and(|value| value == "u 1" || value == "u 3")
+}
+
 /// A yes or no question through the desktop's dialog, `kdialog` then `zenity`. Blocks; `false`
 /// when declined, closed or neither tool is installed.
 #[must_use]

@@ -169,11 +169,21 @@ fn grey(_: &Theme, status: button::Status) -> button::Style {
 fn sync_and_backup(app: &App) -> Element<'_, Message> {
     section(
         "Preferences",
-        card(toggle_row(
-            "Start OneDrive when I sign in",
-            app.autostart,
-            Message::SetAutostart,
-        )),
+        card(
+            column![
+                toggle_row(
+                    "Start OneDrive when I sign in",
+                    app.autostart,
+                    Message::SetAutostart,
+                ),
+                toggle_row(
+                    "Pause syncing on metered networks",
+                    app.pause_on_metered(),
+                    Message::SetPauseOnMetered,
+                ),
+            ]
+            .spacing(theme::GAP),
+        ),
     )
 }
 

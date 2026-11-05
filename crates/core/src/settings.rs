@@ -12,6 +12,8 @@ use crate::profiles::Profile;
 pub struct Settings {
     /// Desktop notification when syncing is paused.
     pub notify_when_paused: bool,
+    /// Stop the client while NetworkManager says the connection is metered.
+    pub pause_on_metered: bool,
     /// Copy the app icon into the user's icon theme, which is where the desktop takes the window
     /// header, taskbar and launcher icons from. On until turned off.
     pub theme_icon: bool,
@@ -35,6 +37,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             notify_when_paused: false,
+            pause_on_metered: false,
             theme_icon: true,
             profile: None,
             accounts: BTreeMap::new(),
@@ -60,6 +63,7 @@ impl Settings {
             let (key, value) = (key.trim(), value.trim());
             match (&section, key) {
                 (None, "notify_when_paused") => settings.notify_when_paused = value == "true",
+                (None, "pause_on_metered") => settings.pause_on_metered = value == "true",
                 (None, "theme_icon") => settings.theme_icon = value != "false",
                 (None, "profile") if !value.is_empty() => settings.profile = Some(value.into()),
                 (Some(name), "email") => {
@@ -85,8 +89,8 @@ impl Settings {
     #[must_use]
     pub fn render(&self) -> String {
         let mut out = format!(
-            "notify_when_paused = {}\ntheme_icon = {}\n",
-            self.notify_when_paused, self.theme_icon
+            "notify_when_paused = {}\npause_on_metered = {}\ntheme_icon = {}\n",
+            self.notify_when_paused, self.pause_on_metered, self.theme_icon
         );
         if let Some(profile) = &self.profile {
             let _ = writeln!(out, "profile = {profile}");
@@ -135,6 +139,7 @@ mod tests {
     fn round_trip() {
         let mut settings = Settings {
             notify_when_paused: true,
+            pause_on_metered: true,
             theme_icon: false,
             profile: Some("Work".into()),
             accounts: BTreeMap::new(),

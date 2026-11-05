@@ -6,6 +6,7 @@ Implemented so far: the profile list is the `[sections]` of our settings file th
 
 ```
 notify_when_paused = false
+pause_on_metered = false
 theme_icon = true
 profile = Nikolai
 
@@ -15,7 +16,7 @@ title = OneDrive - Example AS
 config_dir = /home/user/.config/onedrive/accounts/nikolai
 ```
 
-Top-level keys are the preferences (`theme_icon`, on by default, keeps a copy of the app icon in `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is where the desktop takes the window header, taskbar and launcher icons from; off removes both); one section per profile holds the client's config directory, the sign-in address and the title Microsoft answered, so startup needs no network. Autostart is not a key: `~/.config/autostart/oxdrive.desktop` exists or it does not (`native::autostart`). The rest is intent:
+Top-level keys are the preferences (`pause_on_metered` stops the client while NetworkManager's `Metered` property, polled through `busctl` every 30 s, says yes or guessed yes, and starts it again when that ends; `theme_icon`, on by default, keeps a copy of the app icon in `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is where the desktop takes the window header, taskbar and launcher icons from; off removes both); one section per profile holds the client's config directory, the sign-in address and the title Microsoft answered, so startup needs no network. Autostart is not a key: `~/.config/autostart/oxdrive.desktop` exists or it does not (`native::autostart`). The rest is intent:
 
 - XDG base directories under the app name: `~/.config/oxdrive/` for settings and the profile list, `~/.local/state/oxdrive/` for logs, the recent activity list (`<profile>.recent`, one row per line, newest first, ten rows), the last tray click x (`icon.x`) and the sign-in popup's browser profile (`popup-profile/`). Directories created with owner-only permissions, files written through a temp file and a rename.
 - A profile is a name, the path of a client config directory, and the sign-in address, which gives the flyout its `OneDrive - <tenant>` title through `core::realm` (see client.md). The first import reads OneDriveGUI's `~/.config/onedrive-gui/profiles` so an existing setup carries over.

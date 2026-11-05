@@ -61,6 +61,9 @@ pub enum Message {
     WindowClosed(IcedId),
     SetAutostart(bool),
     SetNotifyPaused(bool),
+    SetPauseOnMetered(bool),
+    /// NetworkManager's metered flag changed, or was first read.
+    Metered(bool),
     EmailChanged(String),
     /// Ask Microsoft for the tenant behind the typed address.
     LookUpTitle,
@@ -109,6 +112,8 @@ pub struct App {
     pub email: String,
     /// The name typed for a new profile.
     pub new_profile: String,
+    /// The current pause is ours, for a metered network, so leaving it may resume.
+    metered_paused: bool,
     pub free_space: Option<u64>,
     /// `(used, total)` from `--display-quota`, for the storage bar.
     pub quota: Option<(u64, u64)>,
@@ -125,6 +130,10 @@ pub struct App {
 impl App {
     pub fn notify_when_paused(&self) -> bool {
         self.settings.notify_when_paused
+    }
+
+    pub fn pause_on_metered(&self) -> bool {
+        self.settings.pause_on_metered
     }
 
     fn save_settings(&mut self) {
@@ -184,6 +193,7 @@ impl App {
             return;
         };
         self.client = None;
+        self.metered_paused = false;
         match client::spawn(&profile.config_dir, reauth, self.client_tx.clone()) {
             Ok(handle) => {
                 self.client = Some(handle);
@@ -390,6 +400,30 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.save_settings();
             Task::none()
         }
+        Message::SetPauseOnMetered(on) => {
+            app.settings.pause_on_metered = on;
+            app.save_settings();
+            if !on && app.metered_paused {
+                app.start_client(false, SyncState::Syncing);
+            }
+            Task::none()
+        }
+        Message::Metered(true) if app.settings.pause_on_metered && app.client.is_some() => {
+            app.client = None;
+            app.metered_paused = true;
+            app.detail = Some("Paused on a metered network".into());
+            app.set_state(SyncState::Paused);
+            if app.settings.notify_when_paused {
+                desktop::notify("OneDrive", "Paused on a metered network");
+            }
+            Task::none()
+        }
+        Message::Metered(false) if app.metered_paused => {
+            app.detail = None;
+            app.start_client(false, SyncState::Syncing);
+            Task::none()
+        }
+        Message::Metered(_) => Task::none(),
         Message::EmailChanged(email) => {
             app.email = email;
             Task::none()
@@ -562,8 +596,14 @@ fn view(app: &App, id: IcedId) -> Element<'_, Message> {
     }
 }
 
-fn subscription(_: &App) -> Subscription<Message> {
+fn subscription(app: &App) -> Subscription<Message> {
+    let metered = if app.settings.pause_on_metered {
+        Subscription::run(metered_events)
+    } else {
+        Subscription::none()
+    };
     Subscription::batch([
+        metered,
         Subscription::run(tray_events),
         Subscription::run(client_events),
         // The flyout takes keyboard focus on demand; a click anywhere else takes it away.
@@ -573,6 +613,25 @@ fn subscription(_: &App) -> Subscription<Message> {
             _ => None,
         }),
     ])
+}
+
+/// NetworkManager's metered flag, first read at once and then on each change. The thread polls;
+/// it ends on the first send after the subscription is dropped.
+fn metered_events() -> BoxStream<'static, Message> {
+    let (tx, rx) = mpsc::unbounded();
+    std::thread::spawn(move || {
+        let mut last = None;
+        loop {
+            let now = desktop::metered();
+            if last != Some(now) && tx.unbounded_send(Message::Metered(now)).is_err() {
+                return;
+            }
+            last = Some(now);
+            // ponytail: a 30 s poll through busctl; a zbus PropertiesChanged signal if it shows
+            std::thread::sleep(std::time::Duration::from_secs(30));
+        }
+    });
+    rx.boxed()
 }
 
 fn client_events() -> BoxStream<'static, Message> {
@@ -677,6 +736,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         autostart,
         email: email.clone(),
         new_profile: String::new(),
+        metered_paused: false,
         free_space: None,
         quota: None,
         client_version: client_version.clone(),
