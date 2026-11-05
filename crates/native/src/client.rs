@@ -141,6 +141,26 @@ pub fn profiles() -> Vec<Profile> {
     }
 }
 
+/// A config directory for a new profile, `~/.config/onedrive/accounts/<name>`, with a `config`
+/// naming `~/OneDrive_<name>` as the sync folder so profiles do not share one. An existing
+/// `config` is kept.
+///
+/// # Errors
+/// The directory or file could not be made.
+pub fn create_config_dir(name: &str) -> oxdrive_core::Result<PathBuf> {
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default();
+    let dir = home.join(".config/onedrive/accounts").join(name);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("could not make {}: {e}", dir.display()))?;
+    let config = dir.join("config");
+    if !config.exists() {
+        std::fs::write(&config, format!("sync_dir = \"~/OneDrive_{name}\"\n"))
+            .map_err(|e| format!("could not write {}: {e}", config.display()))?;
+    }
+    Ok(dir)
+}
+
 /// The profile's local sync folder, read from its `config` file.
 #[must_use]
 pub fn sync_dir(profile: &Profile) -> PathBuf {

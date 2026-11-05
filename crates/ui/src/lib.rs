@@ -66,6 +66,13 @@ pub enum Message {
     LookUpTitle,
     TitleFound(oxdrive_core::Result<String>),
     SelectProfile(String),
+    NewProfileChanged(String),
+    /// Makes a config directory for the typed name and switches to it; the client then asks
+    /// for a sign-in.
+    AddProfile,
+    /// Asks first; `RemoveConfirmed` carries the answer.
+    RemoveProfile,
+    RemoveConfirmed(bool),
     OpenUrl(&'static str),
     /// The profile's sync folder in the file manager.
     OpenFolder,
@@ -100,6 +107,8 @@ pub struct App {
     pub autostart: bool,
     /// The sign-in address as typed, saved once a lookup succeeds.
     pub email: String,
+    /// The name typed for a new profile.
+    pub new_profile: String,
     pub free_space: Option<u64>,
     /// `(used, total)` from `--display-quota`, for the storage bar.
     pub quota: Option<(u64, u64)>,
@@ -465,6 +474,72 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.select_profile(&name);
             Task::none()
         }
+        Message::NewProfileChanged(name) => {
+            app.new_profile = name;
+            Task::none()
+        }
+        Message::AddProfile => {
+            let name = app.new_profile.trim().to_owned();
+            if name.is_empty() || name.contains(['/', '[', ']']) {
+                app.notice = Some("A profile name cannot be empty or contain / [ ]".into());
+            } else if app.profiles.iter().any(|p| p.name == name) {
+                app.notice = Some(format!("There is already a profile called {name}"));
+            } else {
+                match client::create_config_dir(&name) {
+                    Ok(config_dir) => {
+                        app.settings
+                            .accounts
+                            .entry(name.clone())
+                            .or_default()
+                            .config_dir = Some(config_dir.clone());
+                        app.profiles.push(Profile {
+                            name: name.clone(),
+                            config_dir,
+                        });
+                        app.new_profile.clear();
+                        app.notice = None;
+                        app.select_profile(&name);
+                    }
+                    Err(why) => app.notice = Some(why),
+                }
+            }
+            Task::none()
+        }
+        Message::RemoveProfile => match app.profile.clone() {
+            Some(profile) => Task::perform(
+                futures::future::lazy(move |_| {
+                    desktop::confirm(&format!(
+                        "Remove the profile {}? Its files and sign-in stay in {}.",
+                        profile.name,
+                        profile.config_dir.display()
+                    ))
+                }),
+                Message::RemoveConfirmed,
+            ),
+            None => Task::none(),
+        },
+        Message::RemoveConfirmed(false) => Task::none(),
+        Message::RemoveConfirmed(true) => {
+            if let Some(profile) = app.profile.take() {
+                app.profiles.retain(|p| p.name != profile.name);
+                app.settings.accounts.remove(&profile.name);
+                app.client = None;
+                match app.profiles.first().map(|p| p.name.clone()) {
+                    Some(next) => app.select_profile(&next),
+                    None => {
+                        app.settings.profile = None;
+                        app.save_settings();
+                        app.account = "Not signed in".into();
+                        app.title = "OneDrive".into();
+                        app.email.clear();
+                        app.recent.clear();
+                        app.detail = Some("No OneDrive account is set up.".into());
+                        app.set_state(SyncState::Disabled);
+                    }
+                }
+            }
+            Task::none()
+        }
         Message::OpenUrl(url) => {
             desktop::open(url);
             Task::none()
@@ -532,11 +607,24 @@ pub fn run() -> oxdrive_core::Result<()> {
     // The boot closure must be `Fn`, so the handle is handed over through an Option.
     tray::quit_on_signal(tx.clone())?;
     let tray = Mutex::new(Some(tray::spawn(tx)?));
-    let settings = oxdrive_native::settings::load();
+    let mut settings = oxdrive_native::settings::load();
     if settings.theme_icon {
         oxdrive_native::icons::install();
     }
-    let profiles = client::profiles();
+    let mut profiles = settings.profiles();
+    if profiles.is_empty() {
+        // ponytail: first start imports OneDriveGUI's list once; removing every profile imports
+        // it again on the next start, which is also the only way back to a usable app.
+        profiles = client::profiles();
+        for p in &profiles {
+            settings
+                .accounts
+                .entry(p.name.clone())
+                .or_default()
+                .config_dir = Some(p.config_dir.clone());
+        }
+        let _ = oxdrive_native::settings::save(&settings);
+    }
     let profile = settings
         .profile
         .as_deref()
@@ -588,6 +676,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         icon_picks: vec![None; oxdrive_native::icons::SLOTS.len()],
         autostart,
         email: email.clone(),
+        new_profile: String::new(),
         free_space: None,
         quota: None,
         client_version: client_version.clone(),

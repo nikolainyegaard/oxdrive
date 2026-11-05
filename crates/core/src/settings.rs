@@ -4,6 +4,9 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
+use std::path::PathBuf;
+
+use crate::profiles::Profile;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -24,6 +27,8 @@ pub struct Account {
     pub email: String,
     /// `OneDrive - <tenant>` from `crate::realm::title`, kept so startup needs no network.
     pub title: Option<String>,
+    /// The client's config directory. A section without one is not a profile, only a memory.
+    pub config_dir: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -63,6 +68,13 @@ impl Settings {
                 (Some(name), "title") if !value.is_empty() => {
                     settings.accounts.entry(name.clone()).or_default().title = Some(value.into());
                 }
+                (Some(name), "config_dir") if !value.is_empty() => {
+                    settings
+                        .accounts
+                        .entry(name.clone())
+                        .or_default()
+                        .config_dir = Some(value.into());
+                }
                 _ => {}
             }
         }
@@ -84,8 +96,25 @@ impl Settings {
             if let Some(title) = &account.title {
                 let _ = writeln!(out, "title = {title}");
             }
+            if let Some(dir) = &account.config_dir {
+                let _ = writeln!(out, "config_dir = {}", dir.display());
+            }
         }
         out
+    }
+
+    /// The accounts with a config directory, by name.
+    #[must_use]
+    pub fn profiles(&self) -> Vec<Profile> {
+        self.accounts
+            .iter()
+            .filter_map(|(name, a)| {
+                Some(Profile {
+                    name: name.clone(),
+                    config_dir: a.config_dir.clone()?,
+                })
+            })
+            .collect()
     }
 
     /// The flyout title for a profile, `OneDrive` until its tenant is known.
@@ -115,10 +144,18 @@ mod tests {
             Account {
                 email: "user@example.com".into(),
                 title: Some("OneDrive - Example AS".into()),
+                config_dir: Some("/home/user/.config/onedrive/accounts/work".into()),
             },
         );
         settings.accounts.insert("Home".into(), Account::default());
         assert_eq!(Settings::parse(&settings.render()), settings);
+        assert_eq!(
+            settings.profiles(),
+            vec![Profile {
+                name: "Work".into(),
+                config_dir: "/home/user/.config/onedrive/accounts/work".into()
+            }]
+        );
         assert_eq!(settings.title("Work"), "OneDrive - Example AS");
         assert_eq!(settings.title("Home"), "OneDrive");
         assert_eq!(settings.title("Nowhere"), "OneDrive");

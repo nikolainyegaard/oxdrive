@@ -1,6 +1,6 @@
 # Config and paths
 
-Implemented so far: `native::client::profiles` reads OneDriveGUI's `~/.config/onedrive-gui/profiles` (parsed in `core::profiles`, only `config_file` is used) and falls back to one profile at `~/.config/onedrive`. The profile list is still OneDriveGUI's; oxdrive only remembers which one runs.
+Implemented so far: the profile list is the `[sections]` of our settings file that have a `config_dir`. On a start with none, `native::client::profiles` imports OneDriveGUI's `~/.config/onedrive-gui/profiles` (parsed in `core::profiles`, only `config_file` is used), or falls back to one profile at `~/.config/onedrive`, and saves the result. The Account page adds a profile by name (a config directory under `~/.config/onedrive/accounts/<name>` with `sync_dir = "~/OneDrive_<name>"`, then the client asks for a sign-in) and removes the current one after a yes in `kdialog` or `zenity`; removing leaves the client's directory, tokens and files alone.
 
 `~/.config/oxdrive/settings` is ours, parsed and rendered by `core::settings`, written by `native::settings` through a temp file and a rename, directory mode 0700:
 
@@ -12,9 +12,10 @@ profile = Nikolai
 [Nikolai]
 email = user@example.com
 title = OneDrive - Example AS
+config_dir = /home/user/.config/onedrive/accounts/nikolai
 ```
 
-Top-level keys are the preferences (`theme_icon`, on by default, keeps a copy of the app icon in `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is where the desktop takes the window header, taskbar and launcher icons from; off removes both); one section per profile holds the sign-in address and the title Microsoft answered, so startup needs no network. Autostart is not a key: `~/.config/autostart/oxdrive.desktop` exists or it does not (`native::autostart`). The rest is intent:
+Top-level keys are the preferences (`theme_icon`, on by default, keeps a copy of the app icon in `~/.local/share/icons/hicolor/scalable/apps/oxdrive.svg` with a desktop entry in `~/.local/share/applications/`, which is where the desktop takes the window header, taskbar and launcher icons from; off removes both); one section per profile holds the client's config directory, the sign-in address and the title Microsoft answered, so startup needs no network. Autostart is not a key: `~/.config/autostart/oxdrive.desktop` exists or it does not (`native::autostart`). The rest is intent:
 
 - XDG base directories under the app name: `~/.config/oxdrive/` for settings and the profile list, `~/.local/state/oxdrive/` for logs, the recent activity list (`<profile>.recent`, one row per line, newest first, ten rows), the last tray click x (`icon.x`) and the sign-in popup's browser profile (`popup-profile/`). Directories created with owner-only permissions, files written through a temp file and a rename.
 - A profile is a name, the path of a client config directory, and the sign-in address, which gives the flyout its `OneDrive - <tenant>` title through `core::realm` (see client.md). The first import reads OneDriveGUI's `~/.config/onedrive-gui/profiles` so an existing setup carries over.

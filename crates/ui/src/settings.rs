@@ -204,6 +204,28 @@ fn account(app: &App) -> Element<'_, Message> {
                 .on_press(Message::SignIn),
         );
     }
+    if app.profile.is_some() {
+        who = who.push(
+            button(text("Remove").size(theme::TEXT_BODY))
+                .style(grey)
+                .on_press(Message::RemoveProfile),
+        );
+    }
+    let who = column![
+        who.spacing(theme::GAP),
+        row![
+            text_input("New profile name", &app.new_profile)
+                .size(theme::TEXT_BODY)
+                .on_input(Message::NewProfileChanged)
+                .on_submit(Message::AddProfile),
+            button(text("Add account").size(theme::TEXT_BODY))
+                .style(grey)
+                .on_press(Message::AddProfile),
+        ]
+        .spacing(theme::GAP)
+        .align_y(Alignment::Center),
+    ]
+    .spacing(theme::GAP);
 
     let drive = card(
         row![
