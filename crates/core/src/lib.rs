@@ -4,6 +4,7 @@ pub mod client;
 pub mod profiles;
 pub mod realm;
 pub mod settings;
+pub mod sharepoint;
 pub mod status;
 
 /// The only error consumer is a person reading the flyout, so errors are plain text.

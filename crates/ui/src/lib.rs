@@ -26,7 +26,7 @@ use oxdrive_core::settings::Settings;
 use oxdrive_core::status::{Activity, SyncState};
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
-use oxdrive_native::{account, autostart, desktop, popup};
+use oxdrive_native::{account, autostart, desktop, popup, sharepoint};
 
 pub use settings::Page;
 
@@ -72,6 +72,9 @@ pub enum Message {
     /// Asks first; `RemoveConfirmed` carries the answer.
     RemoveProfile,
     RemoveConfirmed(bool),
+    /// Stop syncing a SharePoint library; asks first, `StopSyncConfirmed` carries the answer.
+    StopSync(String),
+    StopSyncConfirmed(String, bool),
     OpenUrl(&'static str),
     /// The profile's sync folder in the file manager.
     OpenFolder,
@@ -121,6 +124,11 @@ pub struct App {
     /// Dropping the handle removes the icon, so it lives as long as the app.
     tray: Option<TrayHandle>,
     client: Option<ClientHandle>,
+    /// One monitor per SharePoint library, alongside the account's own.
+    // ponytail: their events land in the one flyout state with the account's, so a library
+    // that exits or needs a sign-in shows as the account's trouble; split per client when
+    // the per-account state lands.
+    libraries: Vec<(String, ClientHandle)>,
     /// Kept so the client subscription stream outlives any one client process.
     client_tx: mpsc::UnboundedSender<ClientEvent>,
 }
@@ -254,6 +262,43 @@ impl App {
                 self.save_account();
                 return false;
             }
+            ClientEvent::SyncLink(url) => {
+                match (oxdrive_core::sharepoint::parse(&url), &self.profile) {
+                    (Some(link), Some(profile)) => sharepoint::add_library(
+                        link,
+                        &profile.config_dir,
+                        &self.title,
+                        self.client_tx.clone(),
+                    ),
+                    (None, _) => desktop::notify("OneDrive", "That is not a SharePoint sync link."),
+                    (_, None) => desktop::notify("OneDrive", "Sign in to an account first."),
+                }
+                return false;
+            }
+            ClientEvent::Library(Err(why)) => {
+                desktop::notify("OneDrive", &why);
+                return false;
+            }
+            ClientEvent::Library(Ok(profile)) => {
+                let entry = self
+                    .settings
+                    .accounts
+                    .entry(profile.name.clone())
+                    .or_default();
+                entry.config_dir = Some(profile.config_dir.clone());
+                entry.library_of = self.profile.as_ref().map(|p| p.name.clone());
+                self.save_settings();
+                self.profiles.retain(|p| p.name != profile.name);
+                match client::spawn(&profile.config_dir, false, self.client_tx.clone()) {
+                    Ok(handle) => {
+                        self.libraries.push((profile.name.clone(), handle));
+                        desktop::notify("OneDrive", &format!("Now syncing {}", profile.name));
+                    }
+                    Err(why) => desktop::notify("OneDrive", &why),
+                }
+                self.profiles.push(profile);
+                return false;
+            }
             ClientEvent::Event(_) | ClientEvent::Exited(_) => {}
         }
         // The stopping client still reports its shutdown; a pause is not an error.
@@ -288,7 +333,11 @@ impl App {
                     self.set_state(state);
                 }
             }
-            ClientEvent::Email(_) | ClientEvent::Title(_) | ClientEvent::Avatar(_) => {}
+            ClientEvent::Email(_)
+            | ClientEvent::Title(_)
+            | ClientEvent::Avatar(_)
+            | ClientEvent::SyncLink(_)
+            | ClientEvent::Library(_) => {}
             ClientEvent::Exited(why) => {
                 self.client = None;
                 if self.state != SyncState::Blocked {
@@ -561,6 +610,23 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             ),
             None => Task::none(),
         },
+        Message::StopSync(name) => Task::perform(
+            futures::future::lazy(move |_| {
+                let ok = desktop::confirm(&format!(
+                    "Stop syncing {name}? The files already on this PC stay."
+                ));
+                (name, ok)
+            }),
+            |(name, ok)| Message::StopSyncConfirmed(name, ok),
+        ),
+        Message::StopSyncConfirmed(_, false) => Task::none(),
+        Message::StopSyncConfirmed(name, true) => {
+            app.libraries.retain(|(n, _)| *n != name);
+            app.profiles.retain(|p| p.name != name);
+            app.settings.accounts.remove(&name);
+            app.save_settings();
+            Task::none()
+        }
         Message::RemoveConfirmed(false) => Task::none(),
         Message::RemoveConfirmed(true) => {
             if let Some(profile) = app.profile.take() {
@@ -670,7 +736,8 @@ fn tray_events() -> BoxStream<'static, Message> {
 ///
 /// # Errors
 /// Plain text for the terminal: no tray host, or the compositor refused the layer-shell surface.
-pub fn run() -> oxdrive_core::Result<()> {
+/// `link` is an `odopen://` URL from the command line, synced once the tray is up.
+pub fn run(link: Option<String>) -> oxdrive_core::Result<()> {
     let (tx, rx) = mpsc::unbounded();
     *TRAY_RX.lock().unwrap_or_else(PoisonError::into_inner) = Some(rx);
     // The boot closure must be `Fn`, so the handle is handed over through an Option.
@@ -718,6 +785,23 @@ pub fn run() -> oxdrive_core::Result<()> {
         ),
     };
     let client = Mutex::new(client);
+    // Libraries run alongside the account; a failed one is simply not running.
+    let libraries = Mutex::new(
+        profiles
+            .iter()
+            .filter(|p| Some(&p.name) != profile.as_ref().map(|a| &a.name))
+            .filter(|p| settings.is_library(&p.name))
+            .filter_map(|p| {
+                let handle = client::spawn(&p.config_dir, false, client_tx.clone()).ok()?;
+                Some((p.name.clone(), handle))
+            })
+            .collect::<Vec<_>>(),
+    );
+    let _ = sharepoint::register_handler();
+    sharepoint::listen(client_tx.clone());
+    if let Some(url) = link {
+        let _ = client_tx.unbounded_send(ClientEvent::SyncLink(url));
+    }
     let account = profile
         .as_ref()
         .map_or_else(|| "Not signed in".into(), |p| p.name.clone());
@@ -766,6 +850,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         icon_x: oxdrive_native::settings::load_icon_x(),
         tray: tray.lock().unwrap_or_else(PoisonError::into_inner).take(),
         client: client.lock().unwrap_or_else(PoisonError::into_inner).take(),
+        libraries: std::mem::take(&mut *libraries.lock().unwrap_or_else(PoisonError::into_inner)),
         client_tx: client_tx.clone(),
     };
     iced_exwlshell::daemon(boot, tray::APP_ID, update, view)

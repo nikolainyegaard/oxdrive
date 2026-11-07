@@ -8,4 +8,5 @@ pub mod icons;
 pub mod popup;
 pub mod realm;
 pub mod settings;
+pub mod sharepoint;
 pub mod tray;

@@ -31,6 +31,8 @@ pub struct Account {
     pub title: Option<String>,
     /// The client's config directory. A section without one is not a profile, only a memory.
     pub config_dir: Option<PathBuf>,
+    /// For a SharePoint library: the account whose sign-in it uses.
+    pub library_of: Option<String>,
 }
 
 impl Default for Settings {
@@ -72,6 +74,13 @@ impl Settings {
                 (Some(name), "title") if !value.is_empty() => {
                     settings.accounts.entry(name.clone()).or_default().title = Some(value.into());
                 }
+                (Some(name), "library_of") if !value.is_empty() => {
+                    settings
+                        .accounts
+                        .entry(name.clone())
+                        .or_default()
+                        .library_of = Some(value.into());
+                }
                 (Some(name), "config_dir") if !value.is_empty() => {
                     settings
                         .accounts
@@ -103,6 +112,9 @@ impl Settings {
             if let Some(dir) = &account.config_dir {
                 let _ = writeln!(out, "config_dir = {}", dir.display());
             }
+            if let Some(owner) = &account.library_of {
+                let _ = writeln!(out, "library_of = {owner}");
+            }
         }
         out
     }
@@ -119,6 +131,29 @@ impl Settings {
                 })
             })
             .collect()
+    }
+
+    /// The SharePoint libraries that use `account`'s sign-in.
+    #[must_use]
+    pub fn libraries(&self, account: &str) -> Vec<Profile> {
+        self.profiles()
+            .into_iter()
+            .filter(|p| self.is_library(&p.name))
+            .filter(|p| {
+                self.accounts
+                    .get(&p.name)
+                    .and_then(|a| a.library_of.as_deref())
+                    == Some(account)
+            })
+            .collect()
+    }
+
+    /// Whether the profile is a library rather than an account.
+    #[must_use]
+    pub fn is_library(&self, name: &str) -> bool {
+        self.accounts
+            .get(name)
+            .is_some_and(|a| a.library_of.is_some())
     }
 
     /// The flyout title for a profile, `OneDrive` until its tenant is known.
@@ -150,17 +185,29 @@ mod tests {
                 email: "user@example.com".into(),
                 title: Some("OneDrive - Example AS".into()),
                 config_dir: Some("/home/user/.config/onedrive/accounts/work".into()),
+                library_of: None,
             },
         );
         settings.accounts.insert("Home".into(), Account::default());
+        settings.accounts.insert(
+            "Ops - Documents".into(),
+            Account {
+                config_dir: Some("/x".into()),
+                library_of: Some("Work".into()),
+                ..Account::default()
+            },
+        );
         assert_eq!(Settings::parse(&settings.render()), settings);
+        assert_eq!(settings.profiles().len(), 2);
         assert_eq!(
-            settings.profiles(),
+            settings.libraries("Work"),
             vec![Profile {
-                name: "Work".into(),
-                config_dir: "/home/user/.config/onedrive/accounts/work".into()
+                name: "Ops - Documents".into(),
+                config_dir: "/x".into()
             }]
         );
+        assert!(settings.libraries("Home").is_empty());
+        assert!(!settings.is_library("Work"));
         assert_eq!(settings.title("Work"), "OneDrive - Example AS");
         assert_eq!(settings.title("Home"), "OneDrive");
         assert_eq!(settings.title("Nowhere"), "OneDrive");

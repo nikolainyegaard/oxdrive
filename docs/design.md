@@ -69,7 +69,7 @@ Reference is the Windows "OneDrive Settings" window: a normal window, 900 x 680,
 | Page | Rows | Not mirrored |
 |------|------|--------------|
 | Sync and backup | Preferences: Start OneDrive when I sign in | Back up important folders; pause on a metered network |
-| Account | Photo, name, address and an "Unlink this PC" link (removes the profile after a confirm), the profile picker when there is more than one, a greyed "Add an account" button until adding has a flow; a warning banner with Sign in when blocked; drive card with the title and the storage line | Choose folders |
+| Account | Photo, name, address and an "Unlink this PC" link (removes the profile after a confirm), the profile picker when there is more than one, a greyed "Add an account" button until adding has a flow; a warning banner with Sign in when blocked; drive card with the title and the storage line, then one card per SharePoint library of this account with its folder and a Stop sync button | Choose folders, Stop sync on the account card |
 | Notifications | Notify me when syncing is paused | Loading files from other accounts |
 | Icons | ours: the seven icon slots in a row, current icon on the window colour over its label, an arrow, and a grey button that opens the file dialog; Save and Use built-in icons (asks first); a Desktop card with the icon theme toggle | |
 | About | oxdrive version, client version, links: source code, report a problem, the onedrive client | Device and user IDs, insider program |
@@ -77,3 +77,7 @@ Reference is the Windows "OneDrive Settings" window: a normal window, 900 x 680,
 Sidebar items are flat text; the selected page gets the card colour and a 3 px accent bar at the left. Grey buttons (`theme::BUTTON`) are for actions like Sign in and Add an account; only links are blue. Sizes and colours come from measuring the Windows client's screenshots (`measure.py` in the session scratchpad, 2026-11-07): content 260 px in, cards 66 px around a toggle, photo 96 px, accent `#4cc2ff`, links `#99ebff`.
 
 The storage line is `109.18 GB used of 1 TB (10%)` over a 4 px bar, from `--display-quota`, which runs on its own thread each time the monitor starts (not on a reauth run, which has no token yet) and after a sign-in lands. Until it answers the line shows the free space from the monitor's start-up block, and before that "Storage unknown until the client reports it". Sizes use powers of 1024, like the client, so a 1 TiB plan reads `1 TB`.
+
+## SharePoint libraries
+
+The desktop file in `~/.local/share/applications` owns `x-scheme-handler/odopen`. A link from the browser reaches the running tray over `odopen.sock` in the state directory; without a tray the binary starts one and takes the link itself. A library becomes a profile named `<Site> - <Library>` with `drive_id` and `sync_dir = ~/<flyout title>/<Site> - <Library>` in its config and a copy of the account's `refresh_token`, and its monitor runs alongside the account's. The settings entry records `library_of = <account>`, which puts it under that account on the Account page and keeps it out of the picker; Stop sync ends the monitor and drops the entry, the folder stays. Until per-account state lands, its events land in the one flyout.

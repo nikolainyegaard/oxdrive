@@ -12,7 +12,16 @@ fn main() -> ExitCode {
             }
         };
     }
-    match oxdrive_ui::run() {
+    // A SharePoint Sync link: give it to the running tray, or start one that takes it.
+    let link = std::env::args()
+        .nth(1)
+        .filter(|a| a.starts_with("odopen://"));
+    if let Some(url) = &link
+        && oxdrive_native::sharepoint::hand_off(url)
+    {
+        return ExitCode::SUCCESS;
+    }
+    match oxdrive_ui::run(link) {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             eprintln!("oxdrive: {message}");

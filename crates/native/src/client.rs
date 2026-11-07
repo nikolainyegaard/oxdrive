@@ -22,6 +22,10 @@ pub enum ClientEvent {
     Avatar(Vec<u8>),
     /// The process is gone. The text says how, for the flyout.
     Exited(String),
+    /// A SharePoint Sync link arrived, from `sharepoint::listen` or the command line.
+    SyncLink(String),
+    /// From `sharepoint::add_library`: the library's new profile, or why not.
+    Library(Result<Profile, String>),
 }
 
 /// The running monitor process. Dropping it asks the client to stop; a reaper thread waits

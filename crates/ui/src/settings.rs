@@ -194,7 +194,12 @@ fn sync_and_backup(app: &App) -> Element<'_, Message> {
 }
 
 fn account(app: &App) -> Element<'_, Message> {
-    let names: Vec<String> = app.profiles.iter().map(|p| p.name.clone()).collect();
+    let names: Vec<String> = app
+        .profiles
+        .iter()
+        .filter(|p| !app.settings.is_library(&p.name))
+        .map(|p| p.name.clone())
+        .collect();
     let profile = app.profile.as_ref().map(|p| p.name.clone());
     let face: Element<'_, Message> = match &app.avatar {
         Some(handle) => iced::widget::image(handle.clone())
@@ -253,8 +258,40 @@ fn account(app: &App) -> Element<'_, Message> {
     )
     .padding([12.0, 16.0]);
 
+    let libraries = app
+        .profile
+        .as_ref()
+        .map(|p| app.settings.libraries(&p.name))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|lib| {
+            let folder = oxdrive_native::client::sync_dir(&lib)
+                .to_string_lossy()
+                .into_owned();
+            card(
+                row![
+                    column![
+                        text(lib.name.clone()).size(theme::TEXT_BODY),
+                        text(folder)
+                            .size(theme::TEXT_SMALL)
+                            .color(theme::TEXT_SECONDARY),
+                    ]
+                    .spacing(4),
+                    space::horizontal(),
+                    button("Stop sync")
+                        .style(grey)
+                        .on_press(Message::StopSync(lib.name)),
+                ]
+                .spacing(theme::PADDING)
+                .align_y(Alignment::Center),
+            )
+            .padding([12.0, 16.0])
+            .into()
+        });
+    let drives = column![drive].extend(libraries).spacing(theme::GAP);
+
     // 36 px from the photo to the drive card, measured.
-    let page = column![who, drive].spacing(36);
+    let page = column![who, drives].spacing(36);
     if app.state != SyncState::Blocked {
         return page.into();
     }

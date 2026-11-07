@@ -36,7 +36,7 @@ pub fn fetch(profile: &str, config_dir: &Path, events: UnboundedSender<ClientEve
     let profile = profile.to_owned();
     let config_dir = config_dir.to_owned();
     thread::spawn(move || {
-        let Some((email, token)) = refresh(&config_dir) else {
+        let Some((email, token)) = refresh(&config_dir, "Files.ReadWrite") else {
             return;
         };
         // ponytail: the realm lookup runs on every client start, one small request to
@@ -57,7 +57,7 @@ pub fn fetch(profile: &str, config_dir: &Path, events: UnboundedSender<ClientEve
 }
 
 /// `(sign-in address, access token)` from a refresh with the client's token.
-fn refresh(config_dir: &Path) -> Option<(Option<String>, String)> {
+pub(crate) fn refresh(config_dir: &Path, scope: &str) -> Option<(Option<String>, String)> {
     let refresh = std::fs::read_to_string(config_dir.join("refresh_token")).ok()?;
     // ponytail: tenant is `common` like the client's default; an `azure_tenant_id` in the
     // client config is not read. Microsoft keeps the old refresh token valid after a refresh,
@@ -66,7 +66,7 @@ fn refresh(config_dir: &Path) -> Option<(Option<String>, String)> {
     // only the access token (probed 2026-11-07). Files.ReadWrite keeps it a Graph token.
     let body = format!(
         "client_id={CLIENT_ID}&redirect_uri={REDIRECT}&grant_type=refresh_token\
-         &scope=openid%20profile%20email%20Files.ReadWrite&refresh_token={}",
+         &scope=openid%20profile%20email%20{scope}&refresh_token={}",
         refresh.trim()
     );
     let json = String::from_utf8_lossy(&curl(&[TOKEN_URL, "-d", "@-"], &body)?).into_owned();
@@ -78,9 +78,14 @@ fn refresh(config_dir: &Path) -> Option<(Option<String>, String)> {
 }
 
 fn photo(token: &str) -> Option<Vec<u8>> {
+    graph(PHOTO_URL, token)
+}
+
+/// A Graph GET as bytes; the token goes in on stdin, never on argv.
+pub(crate) fn graph(url: &str, token: &str) -> Option<Vec<u8>> {
     curl(
         &["-K", "-"],
-        &format!("url = \"{PHOTO_URL}\"\nheader = \"Authorization: Bearer {token}\"\n"),
+        &format!("url = \"{url}\"\nheader = \"Authorization: Bearer {token}\"\n"),
     )
 }
 
@@ -101,7 +106,7 @@ fn curl(args: &[&str], stdin: &str) -> Option<Vec<u8>> {
 
 /// A string value of a top-level key, without a JSON parser. Enough for tokens and an
 /// address, which hold no quote or backslash.
-fn field<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn field<'a>(json: &'a str, key: &str) -> Option<&'a str> {
     json.split(&format!("\"{key}\":\""))
         .nth(1)?
         .split('"')
