@@ -16,7 +16,9 @@ const MAX_LINE: u64 = 16 * 1024;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClientEvent {
     Event(Event),
-    /// The account photo, from `avatar::fetch`.
+    /// From `account::fetch`: the sign-in address, the flyout title, the photo.
+    Email(String),
+    Title(String),
     Avatar(Vec<u8>),
     /// The process is gone. The text says how, for the flyout.
     Exited(String),

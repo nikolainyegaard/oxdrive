@@ -264,30 +264,7 @@ fn account(app: &App) -> Element<'_, Message> {
         .align_y(Alignment::Center),
     );
 
-    let lookup = card(
-        column![
-            text("Sign-in address").size(theme::TEXT_BODY),
-            text("Used only to look up the account name")
-                .size(theme::TEXT_SMALL)
-                .color(theme::TEXT_SECONDARY),
-            row![
-                text_input("you@example.com", &app.email)
-                    .size(theme::TEXT_BODY)
-                    .on_input(Message::EmailChanged)
-                    .on_submit(Message::LookUpTitle),
-                button(text("Look up").size(theme::TEXT_BODY))
-                    .style(grey)
-                    .on_press(Message::LookUpTitle),
-            ]
-            .spacing(theme::GAP)
-            .align_y(Alignment::Center),
-        ]
-        .spacing(theme::GAP),
-    );
-
-    column![who, drive, lookup]
-        .spacing(theme::PADDING * 1.5)
-        .into()
+    column![who, drive].spacing(theme::PADDING * 1.5).into()
 }
 
 fn notifications(app: &App) -> Element<'_, Message> {

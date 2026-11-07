@@ -52,9 +52,9 @@ Sign in reruns the client with `--reauth` through the same `start_client` path a
 
 Quit drops the `ClientHandle` before `iced::exit`; the drop sends SIGTERM through `kill` and hands the `Child` to a reaper thread, so the UI never waits. The client finishes its checkpoint on its own, even after oxdrive has exited. The client runs with `--disable-notifications`: oxdrive owns what the desktop shows.
 
-The settings window is an xdg toplevel opened with `Message::NewBaseWindow` from the flyout's Settings button or the tray menu; `view` picks the settings view for that window id and the flyout for everything else, and the daemon's title callback names it. The compositor closes it, which arrives as a `Window::Closed` event with the id. Settings changes are saved on every toggle; the tenant lookup runs on iced's thread pool through `Task::perform` so the UI thread never waits on the network, and its result is written to the profile's section.
+The settings window is an xdg toplevel opened with `Message::NewBaseWindow` from the flyout's Settings button or the tray menu; `view` picks the settings view for that window id and the flyout for everything else, and the daemon's title callback names it. The compositor closes it, which arrives as a `Window::Closed` event with the id. Settings changes are saved on every toggle; the address and title arrive as client events from the account fetch thread and are written to the profile's section when they change.
 
-The tenant name for the title comes from one `curl` call to Microsoft's home realm discovery, not from the client and not from an HTTP crate: `native::realm::lookup` runs the process, `core::realm::title` reads the one field that matters. It runs once per sign-in address and the result belongs in the profile.
+The tenant name for the title comes from one `curl` call to Microsoft's home realm discovery, not from the client and not from an HTTP crate: `native::realm::lookup` runs the process, `core::realm::title` reads the one field that matters. `native::account::fetch` runs it once per client start with the address from the token's `id_token`, and the result belongs in the profile.
 
 ## Dependencies
 

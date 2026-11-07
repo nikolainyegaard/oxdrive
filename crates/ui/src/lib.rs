@@ -26,7 +26,7 @@ use oxdrive_core::settings::Settings;
 use oxdrive_core::status::{Activity, SyncState};
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
-use oxdrive_native::{autostart, avatar, desktop, popup, realm};
+use oxdrive_native::{account, autostart, desktop, popup};
 
 pub use settings::Page;
 
@@ -64,10 +64,6 @@ pub enum Message {
     SetPauseOnMetered(bool),
     /// NetworkManager's metered flag changed, or was first read.
     Metered(bool),
-    EmailChanged(String),
-    /// Ask Microsoft for the tenant behind the typed address.
-    LookUpTitle,
-    TitleFound(oxdrive_core::Result<String>),
     SelectProfile(String),
     NewProfileChanged(String),
     /// Makes a config directory for the typed name and switches to it; the client then asks
@@ -108,7 +104,7 @@ pub struct App {
     /// Files chosen on the Icons page, one per slot, until Save copies them in.
     pub icon_picks: Vec<Option<PathBuf>>,
     pub autostart: bool,
-    /// The sign-in address as typed, saved once a lookup succeeds.
+    /// The sign-in address, from the token the account fetch refreshes.
     pub email: String,
     /// The name typed for a new profile.
     pub new_profile: String,
@@ -158,11 +154,25 @@ impl App {
         self.recent = oxdrive_native::settings::load_recent(name);
         self.free_space = None;
         self.quota = None;
-        self.avatar = avatar::load(name).map(iced::widget::image::Handle::from_bytes);
+        self.avatar = account::load_photo(name).map(iced::widget::image::Handle::from_bytes);
         self.profile = Some(profile);
         self.settings.profile = Some(name.to_owned());
         self.save_settings();
         self.start_client(false, SyncState::Syncing);
+    }
+
+    /// Writes the address and title into the profile's section, when they changed.
+    fn save_account(&mut self) {
+        let Some(name) = self.profile.as_ref().map(|p| p.name.clone()) else {
+            return;
+        };
+        let account = self.settings.accounts.entry(name).or_default();
+        if account.email == self.email && account.title.as_deref() == Some(&self.title) {
+            return;
+        }
+        account.email.clone_from(&self.email);
+        account.title = Some(self.title.clone());
+        self.save_settings();
     }
 
     /// Changes the sync state everywhere it shows: the flyout and the tray icon.
@@ -204,7 +214,7 @@ impl App {
                 self.set_state(state);
                 if !reauth {
                     client::quota(&profile.config_dir, self.client_tx.clone());
-                    avatar::fetch(&profile.name, &profile.config_dir, self.client_tx.clone());
+                    account::fetch(&profile.name, &profile.config_dir, self.client_tx.clone());
                 }
             }
             Err(why) => {
@@ -229,9 +239,22 @@ impl App {
 
     /// Applies a client event. True when a sign-in just landed: the first sync after Blocked.
     fn on_client(&mut self, event: ClientEvent) -> bool {
-        if let ClientEvent::Avatar(bytes) = event {
-            self.avatar = Some(iced::widget::image::Handle::from_bytes(bytes));
-            return false;
+        match event {
+            ClientEvent::Avatar(bytes) => {
+                self.avatar = Some(iced::widget::image::Handle::from_bytes(bytes));
+                return false;
+            }
+            ClientEvent::Email(email) => {
+                self.email = email;
+                self.save_account();
+                return false;
+            }
+            ClientEvent::Title(title) => {
+                self.title = title;
+                self.save_account();
+                return false;
+            }
+            ClientEvent::Event(_) | ClientEvent::Exited(_) => {}
         }
         // The stopping client still reports its shutdown; a pause is not an error.
         if self.state == SyncState::Paused {
@@ -265,7 +288,7 @@ impl App {
                     self.set_state(state);
                 }
             }
-            ClientEvent::Avatar(_) => {}
+            ClientEvent::Email(_) | ClientEvent::Title(_) | ClientEvent::Avatar(_) => {}
             ClientEvent::Exited(why) => {
                 self.client = None;
                 if self.state != SyncState::Blocked {
@@ -277,7 +300,7 @@ impl App {
         if signed_in && let Some(profile) = &self.profile {
             popup::close();
             client::quota(&profile.config_dir, self.client_tx.clone());
-            avatar::fetch(&profile.name, &profile.config_dir, self.client_tx.clone());
+            account::fetch(&profile.name, &profile.config_dir, self.client_tx.clone());
         }
         signed_in
     }
@@ -442,24 +465,6 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::Metered(_) => Task::none(),
-        Message::EmailChanged(email) => {
-            app.email = email;
-            Task::none()
-        }
-        Message::LookUpTitle => {
-            let email = app.email.trim().to_owned();
-            if !email.contains('@') {
-                app.notice = Some("Type the address you sign in with.".into());
-                return Task::none();
-            }
-            app.notice = Some("Asking Microsoft...".into());
-            // ponytail: the lookup blocks one thread of iced's pool for up to ten seconds; a
-            // dedicated thread and channel if the pool ever matters
-            Task::perform(
-                futures::future::lazy(move |_| realm::lookup(&email)),
-                Message::TitleFound,
-            )
-        }
         Message::PickIcon(slot) => Task::perform(
             futures::future::lazy(|_| desktop::pick_svg()),
             move |path| Message::IconPicked(slot, path),
@@ -506,20 +511,6 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             if let Some(tray) = &app.tray {
                 tray.reload_icons();
             }
-            Task::none()
-        }
-        Message::TitleFound(Ok(title)) => {
-            if let Some(name) = app.profile.as_ref().map(|p| p.name.clone()) {
-                let account = app.settings.accounts.entry(name).or_default();
-                account.email = app.email.trim().to_owned();
-                account.title = Some(title.clone());
-                app.save_settings();
-            }
-            app.title = title;
-            Task::none()
-        }
-        Message::TitleFound(Err(why)) => {
-            app.notice = Some(why);
             Task::none()
         }
         Message::SelectProfile(name) => {

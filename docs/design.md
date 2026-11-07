@@ -69,11 +69,11 @@ Reference is the Windows "OneDrive Settings" window: a normal window, 900 x 680,
 | Page | Rows | Not mirrored |
 |------|------|--------------|
 | Sync and backup | Preferences: Start OneDrive when I sign in | Back up important folders; pause on a metered network |
-| Account | Name and address row with the profile picker when there is more than one and Sign in when blocked; drive card with the title and the storage line; sign-in address card with Look up | Avatar, Add account, unlink, Choose folders |
+| Account | Name and address row with the profile picker when there is more than one and Sign in when blocked; drive card with the title and the storage line | Choose folders |
 | Notifications | Notify me when syncing is paused | Loading files from other accounts |
 | Icons | ours: the seven icon slots in a row, current icon on the window colour over its label, an arrow, and a grey button that opens the file dialog; Save and Use built-in icons (asks first); a Desktop card with the icon theme toggle | |
 | About | oxdrive version, client version, links: source code, report a problem, the onedrive client | Device and user IDs, insider program |
 
-Sidebar items are flat text; the selected page gets the card colour and a 3 px accent bar at the left. Grey buttons (`theme::BUTTON`) are for actions like Look up and Sign in; only links are blue.
+Sidebar items are flat text; the selected page gets the card colour and a 3 px accent bar at the left. Grey buttons (`theme::BUTTON`) are for actions like Sign in and Remove; only links are blue.
 
 The storage line is `109.18 GB used of 1 TB (10%)` over a 4 px bar, from `--display-quota`, which runs on its own thread each time the monitor starts (not on a reauth run, which has no token yet) and after a sign-in lands. Until it answers the line shows the free space from the monitor's start-up block, and before that "Storage unknown until the client reports it". Sizes use powers of 1024, like the client, so a 1 TiB plan reads `1 TB`.
