@@ -26,7 +26,7 @@ use oxdrive_core::settings::Settings;
 use oxdrive_core::status::{Activity, SyncState};
 use oxdrive_native::client::{self, ClientEvent, ClientHandle};
 use oxdrive_native::tray::{self, TrayEvent, TrayHandle};
-use oxdrive_native::{autostart, desktop, popup, realm};
+use oxdrive_native::{autostart, avatar, desktop, popup, realm};
 
 pub use settings::Page;
 
@@ -117,6 +117,8 @@ pub struct App {
     pub free_space: Option<u64>,
     /// `(used, total)` from `--display-quota`, for the storage bar.
     pub quota: Option<(u64, u64)>,
+    /// The account photo, when Graph has one and the sign-in granted `User.Read`.
+    pub avatar: Option<iced::widget::image::Handle>,
     pub client_version: String,
     /// Where the icon was last clicked, so the flyout can open without a click after a sign-in.
     icon_x: i32,
@@ -156,6 +158,7 @@ impl App {
         self.recent = oxdrive_native::settings::load_recent(name);
         self.free_space = None;
         self.quota = None;
+        self.avatar = avatar::load(name).map(iced::widget::image::Handle::from_bytes);
         self.profile = Some(profile);
         self.settings.profile = Some(name.to_owned());
         self.save_settings();
@@ -201,6 +204,7 @@ impl App {
                 self.set_state(state);
                 if !reauth {
                     client::quota(&profile.config_dir, self.client_tx.clone());
+                    avatar::fetch(&profile.name, &profile.config_dir, self.client_tx.clone());
                 }
             }
             Err(why) => {
@@ -225,6 +229,10 @@ impl App {
 
     /// Applies a client event. True when a sign-in just landed: the first sync after Blocked.
     fn on_client(&mut self, event: ClientEvent) -> bool {
+        if let ClientEvent::Avatar(bytes) = event {
+            self.avatar = Some(iced::widget::image::Handle::from_bytes(bytes));
+            return false;
+        }
         // The stopping client still reports its shutdown; a pause is not an error.
         if self.state == SyncState::Paused {
             return false;
@@ -257,6 +265,7 @@ impl App {
                     self.set_state(state);
                 }
             }
+            ClientEvent::Avatar(_) => {}
             ClientEvent::Exited(why) => {
                 self.client = None;
                 if self.state != SyncState::Blocked {
@@ -268,6 +277,7 @@ impl App {
         if signed_in && let Some(profile) = &self.profile {
             popup::close();
             client::quota(&profile.config_dir, self.client_tx.clone());
+            avatar::fetch(&profile.name, &profile.config_dir, self.client_tx.clone());
         }
         signed_in
     }
@@ -564,6 +574,7 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
                         app.settings.profile = None;
                         app.save_settings();
                         app.account = "Not signed in".into();
+                        app.avatar = None;
                         app.title = "OneDrive".into();
                         app.email.clear();
                         app.recent.clear();
@@ -739,6 +750,7 @@ pub fn run() -> oxdrive_core::Result<()> {
         metered_paused: false,
         free_space: None,
         quota: None,
+        avatar: None,
         client_version: client_version.clone(),
         account: account.clone(),
         recent: recent.clone(),

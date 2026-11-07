@@ -56,6 +56,9 @@ pub fn called_as_shim() -> bool {
 /// # Errors
 /// No browser, or it could not be started.
 pub fn open(url: &str) -> oxdrive_core::Result<()> {
+    // The client asks for Files and Sites scopes only; `User.Read` is what the account photo
+    // needs (avatar.rs). The code exchange and the refresh send no scope, so the consent sticks.
+    let url = url.replacen("offline_access", "offline_access%20User.Read", 1);
     let browser = browser().ok_or("no Chromium-family browser for the sign-in popup")?;
     let dir = runtime_dir()?;
     let profile = crate::settings::state_dir()

@@ -190,7 +190,16 @@ fn sync_and_backup(app: &App) -> Element<'_, Message> {
 fn account(app: &App) -> Element<'_, Message> {
     let names: Vec<String> = app.profiles.iter().map(|p| p.name.clone()).collect();
     let profile = app.profile.as_ref().map(|p| p.name.clone());
+    let face: Element<'_, Message> = match &app.avatar {
+        Some(handle) => iced::widget::image(handle.clone())
+            .width(theme::AVATAR)
+            .height(theme::AVATAR)
+            .border_radius(theme::AVATAR / 2.0)
+            .into(),
+        None => icon(Icon::Person, theme::AVATAR, theme::TEXT_SECONDARY),
+    };
     let mut who = row![
+        face,
         column![
             text(&app.account)
                 .size(theme::TEXT_BODY)
@@ -207,14 +216,18 @@ fn account(app: &App) -> Element<'_, Message> {
         who =
             who.push(pick_list(names, profile, Message::SelectProfile).text_size(theme::TEXT_BODY));
     }
-    if app.state == SyncState::Blocked {
+    if app.profile.is_some() {
+        // Signing in again is how an older account picks up `User.Read` for its photo.
+        let label = if app.state == SyncState::Blocked {
+            "Sign in"
+        } else {
+            "Sign in again"
+        };
         who = who.push(
-            button(text("Sign in").size(theme::TEXT_BODY))
+            button(text(label).size(theme::TEXT_BODY))
                 .style(grey)
                 .on_press(Message::SignIn),
         );
-    }
-    if app.profile.is_some() {
         who = who.push(
             button(text("Remove").size(theme::TEXT_BODY))
                 .style(grey)
