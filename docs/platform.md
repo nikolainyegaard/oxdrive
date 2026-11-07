@@ -18,4 +18,4 @@ GNOME has no layer-shell. The planned fallback is an ordinary iced window, decid
 
 ## What Wayland will not do
 
-A toplevel cannot be positioned, hidden and re-shown, raised or given focus by the app itself. The settings window is one, so a second Settings press while it is open does nothing; the window stays where the compositor put it. Layer-shell sidesteps positioning. Focus comes through xdg-activation tokens, which Plasma passes to the tray on a real click. See gotchas.md for what this ruled out.
+A toplevel cannot be positioned, hidden and re-shown, or raised by the app itself. The settings window is one; it stays where the compositor put it. Layer-shell sidesteps positioning. Focus comes through `xdg_activation_v1`: a second Settings press while the window is open sends `RequestActivationToken` for it (iced_exwlshell 0.21), minted with the serial of the click on the flyout, and `activate` on the token makes the compositor raise and focus the window. Plasma passes a token to the tray on a real click the same way. See gotchas.md for what this ruled out.

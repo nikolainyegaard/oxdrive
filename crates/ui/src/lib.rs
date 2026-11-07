@@ -15,8 +15,8 @@ use futures::stream::BoxStream;
 use iced::{Element, Subscription, Task};
 use iced_exwlshell::actions::IcedXdgWindowSettings;
 use iced_exwlshell::reexport::{
-    Anchor, IcedId, KeyboardInteractivity, Layer, LayerSize, Margin, NewLayerShellSettings,
-    PixelSize,
+    ActivationTokenSink, Anchor, IcedId, KeyboardInteractivity, Layer, LayerSize, Margin,
+    NewLayerShellSettings, PixelSize, XdgActivationTokenV1State,
 };
 use iced_exwlshell::settings::{LayerShellSettings, StartMode};
 use iced_exwlshell::to_layer_message;
@@ -357,9 +357,17 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::Tray(TrayEvent::Settings) | Message::OpenSettings => {
-            // An open window cannot be raised from here (see platform.md); it stays where it is.
-            if app.settings_window.is_some() {
-                return Task::none();
+            // Already open: ask the compositor to raise and focus it. The token is minted with
+            // the serial of the click that got us here, so the compositor trusts it.
+            if let Some(id) = app.settings_window {
+                return Task::done(Message::RequestActivationToken {
+                    id,
+                    sink: ActivationTokenSink::callback(|state| {
+                        if let XdgActivationTokenV1State::Ready(token) = state {
+                            token.activate();
+                        }
+                    }),
+                });
             }
             let id = IcedId::unique();
             app.settings_window = Some(id);
