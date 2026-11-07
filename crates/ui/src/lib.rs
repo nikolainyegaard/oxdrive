@@ -704,7 +704,11 @@ pub fn run() -> oxdrive_core::Result<()> {
     *CLIENT_RX.lock().unwrap_or_else(PoisonError::into_inner) = Some(client_rx);
     let (client, state, detail) = match &profile {
         Some(p) => match client::spawn(&p.config_dir, false, client_tx.clone()) {
-            Ok(handle) => (Some(handle), SyncState::Syncing, None),
+            Ok(handle) => {
+                client::quota(&p.config_dir, client_tx.clone());
+                account::fetch(&p.name, &p.config_dir, client_tx.clone());
+                (Some(handle), SyncState::Syncing, None)
+            }
             Err(why) => (None, SyncState::Disabled, Some(why)),
         },
         None => (
@@ -749,7 +753,10 @@ pub fn run() -> oxdrive_core::Result<()> {
         metered_paused: false,
         free_space: None,
         quota: None,
-        avatar: None,
+        avatar: profile
+            .as_ref()
+            .and_then(|p| account::load_photo(&p.name))
+            .map(iced::widget::image::Handle::from_bytes),
         client_version: client_version.clone(),
         account: account.clone(),
         recent: recent.clone(),

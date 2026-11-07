@@ -62,8 +62,11 @@ fn refresh(config_dir: &Path) -> Option<(Option<String>, String)> {
     // ponytail: tenant is `common` like the client's default; an `azure_tenant_id` in the
     // client config is not read. Microsoft keeps the old refresh token valid after a refresh,
     // so the client's copy on disk stays good. Both tokens go in on stdin, never on argv.
+    // `scope` is what makes the reply carry an `id_token`; a refresh without one returns
+    // only the access token (probed 2026-11-07). Files.ReadWrite keeps it a Graph token.
     let body = format!(
-        "client_id={CLIENT_ID}&redirect_uri={REDIRECT}&grant_type=refresh_token&refresh_token={}",
+        "client_id={CLIENT_ID}&redirect_uri={REDIRECT}&grant_type=refresh_token\
+         &scope=openid%20profile%20email%20Files.ReadWrite&refresh_token={}",
         refresh.trim()
     );
     let json = String::from_utf8_lossy(&curl(&[TOKEN_URL, "-d", "@-"], &body)?).into_owned();
