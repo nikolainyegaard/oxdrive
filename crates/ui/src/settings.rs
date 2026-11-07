@@ -1,9 +1,7 @@
 //! The settings window: a sidebar with five pages and the storage line, like the Windows client.
 
 use iced::widget::svg::Handle;
-use iced::widget::{
-    button, column, container, pick_list, progress_bar, row, space, text, text_input, toggler,
-};
+use iced::widget::{button, column, container, pick_list, progress_bar, row, space, text, toggler};
 use iced::{Alignment, Border, Element, Length, Theme};
 
 use oxdrive_core::status::{SyncState, human_size, storage_line};
@@ -81,7 +79,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .on_press(Message::ShowPage(page))
         .into()
     }))
-    .spacing(4);
+    .spacing(6);
 
     let storage = column![text("Storage").size(theme::TEXT_BODY).font(theme::SEMIBOLD)]
         .extend(app.quota.map(|(used, total)| {
@@ -122,12 +120,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
             .into()
     }))
     .spacing(theme::PADDING * 1.5)
-    .width(Length::Fill)
-    .padding([theme::GAP, theme::PADDING]);
+    .width(Length::Fill);
 
     row![sidebar, content]
-        .spacing(theme::PADDING)
-        .padding([theme::PADDING * 2.0, theme::PADDING])
+        .spacing(theme::SIDEBAR_GAP)
+        .padding(theme::WINDOW_PADDING)
         .into()
 }
 
@@ -157,7 +154,10 @@ fn grey(_: &Theme, status: button::Status) -> button::Style {
             }
             .into(),
         ),
-        text_color: theme::TEXT,
+        text_color: match status {
+            button::Status::Disabled => theme::TEXT_SECONDARY,
+            _ => theme::TEXT,
+        },
         border: Border {
             radius: theme::CARD_RADIUS.into(),
             ..Border::default()
@@ -166,24 +166,30 @@ fn grey(_: &Theme, status: button::Status) -> button::Style {
     }
 }
 
+/// A blue text link.
+fn link(label: &'static str, message: Message) -> button::Button<'static, Message> {
+    button(text(label).size(theme::TEXT_BODY).color(theme::LINK))
+        .style(button::text)
+        .padding(0)
+        .on_press(message)
+}
+
 fn sync_and_backup(app: &App) -> Element<'_, Message> {
     section(
         "Preferences",
-        card(
-            column![
-                toggle_row(
-                    "Start OneDrive when I sign in",
-                    app.autostart,
-                    Message::SetAutostart,
-                ),
-                toggle_row(
-                    "Pause syncing on metered networks",
-                    app.pause_on_metered(),
-                    Message::SetPauseOnMetered,
-                ),
-            ]
-            .spacing(theme::GAP),
-        ),
+        column![
+            card(toggle_row(
+                "Start OneDrive when I sign in",
+                app.autostart,
+                Message::SetAutostart,
+            )),
+            card(toggle_row(
+                "Pause syncing on metered networks",
+                app.pause_on_metered(),
+                Message::SetPauseOnMetered,
+            )),
+        ]
+        .spacing(theme::GAP),
     )
 }
 
@@ -198,57 +204,39 @@ fn account(app: &App) -> Element<'_, Message> {
             .into(),
         None => icon(Icon::Person, theme::AVATAR, theme::TEXT_SECONDARY),
     };
-    let mut who = row![
+    let who = row![
         face,
         column![
             text(&app.account)
                 .size(theme::TEXT_BODY)
                 .font(theme::SEMIBOLD),
-            text(&app.email)
-                .size(theme::TEXT_BODY)
-                .color(theme::TEXT_SECONDARY),
+            text(&app.email).size(theme::TEXT_BODY),
+            space::vertical().height(theme::PADDING),
+            link("Unlink this PC", Message::RemoveProfile),
         ]
         .spacing(4),
         space::horizontal(),
     ]
+    .extend((names.len() > 1).then(|| {
+        pick_list(names, profile, Message::SelectProfile)
+            .text_size(theme::TEXT_BODY)
+            .into()
+    }))
+    .push(
+        // ponytail: no on_press until adding a second account has a flow; the pieces are
+        // `Message::AddProfile` and `app.new_profile`.
+        button(
+            row![
+                icon(Icon::Plus, theme::ICON, theme::TEXT_SECONDARY),
+                text("Add an account").size(theme::TEXT_BODY)
+            ]
+            .spacing(theme::GAP)
+            .align_y(Alignment::Center),
+        )
+        .style(grey),
+    )
+    .spacing(theme::PADDING * 1.5)
     .align_y(Alignment::Center);
-    if names.len() > 1 {
-        who =
-            who.push(pick_list(names, profile, Message::SelectProfile).text_size(theme::TEXT_BODY));
-    }
-    if app.profile.is_some() {
-        // Signing in again is how an older account picks up `User.Read` for its photo.
-        let label = if app.state == SyncState::Blocked {
-            "Sign in"
-        } else {
-            "Sign in again"
-        };
-        who = who.push(
-            button(text(label).size(theme::TEXT_BODY))
-                .style(grey)
-                .on_press(Message::SignIn),
-        );
-        who = who.push(
-            button(text("Remove").size(theme::TEXT_BODY))
-                .style(grey)
-                .on_press(Message::RemoveProfile),
-        );
-    }
-    let who = column![
-        who.spacing(theme::GAP),
-        row![
-            text_input("New profile name", &app.new_profile)
-                .size(theme::TEXT_BODY)
-                .on_input(Message::NewProfileChanged)
-                .on_submit(Message::AddProfile),
-            button(text("Add account").size(theme::TEXT_BODY))
-                .style(grey)
-                .on_press(Message::AddProfile),
-        ]
-        .spacing(theme::GAP)
-        .align_y(Alignment::Center),
-    ]
-    .spacing(theme::GAP);
 
     let drive = card(
         row![
@@ -262,9 +250,27 @@ fn account(app: &App) -> Element<'_, Message> {
             space::horizontal(),
         ]
         .align_y(Alignment::Center),
-    );
+    )
+    .padding([12.0, 16.0]);
 
-    column![who, drive].spacing(theme::PADDING * 1.5).into()
+    // 36 px from the photo to the drive card, measured.
+    let page = column![who, drive].spacing(36);
+    if app.state != SyncState::Blocked {
+        return page.into();
+    }
+    let banner = card(
+        row![
+            icon(Icon::Warning, theme::ICON_LARGE, theme::WARNING),
+            text("OneDrive needs you to sign in again before it can sync.").size(theme::TEXT_BODY),
+            space::horizontal(),
+            button(text("Sign in").size(theme::TEXT_BODY))
+                .style(grey)
+                .on_press(Message::SignIn),
+        ]
+        .spacing(theme::GAP)
+        .align_y(Alignment::Center),
+    );
+    column![banner, page].spacing(theme::PADDING * 1.5).into()
 }
 
 fn notifications(app: &App) -> Element<'_, Message> {
@@ -361,12 +367,7 @@ fn icons(app: &App) -> Element<'_, Message> {
 }
 
 fn about(app: &App) -> Element<'_, Message> {
-    let link = |label: &'static str, url: &'static str| {
-        button(text(label).size(theme::TEXT_BODY).color(theme::ACCENT))
-            .style(button::text)
-            .padding(0)
-            .on_press(Message::OpenUrl(url))
-    };
+    let link = |label: &'static str, url: &'static str| link(label, Message::OpenUrl(url));
     column![
         section(
             "OneDrive info",
@@ -416,7 +417,7 @@ fn section<'a>(title: &'a str, body: impl Into<Element<'a, Message>>) -> Element
         text(title).size(theme::TEXT_BODY).font(theme::SEMIBOLD),
         body.into()
     ]
-    .spacing(theme::GAP)
+    .spacing(theme::PADDING)
     .into()
 }
 
@@ -434,7 +435,7 @@ fn toggle_row<'a>(label: &'a str, on: bool, message: fn(bool) -> Message) -> Ele
 
 fn card<'a>(content: impl Into<Element<'a, Message>>) -> container::Container<'a, Message> {
     container(content)
-        .padding(theme::PADDING)
+        .padding(theme::CARD_PADDING)
         .width(Length::Fill)
         .style(|_| container::Style {
             background: Some(theme::CARD.into()),

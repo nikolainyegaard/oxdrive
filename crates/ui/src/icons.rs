@@ -22,6 +22,7 @@ pub enum Icon {
     Info,
     Image,
     ArrowDown,
+    Plus,
 }
 
 impl Icon {
@@ -44,6 +45,7 @@ impl Icon {
             Self::Info => "info",
             Self::Image => "image",
             Self::ArrowDown => "arrow-down",
+            Self::Plus => "plus",
         }
     }
 
@@ -70,6 +72,7 @@ impl Icon {
             Self::Info => asset!("info"),
             Self::Image => asset!("image"),
             Self::ArrowDown => asset!("arrow-down"),
+            Self::Plus => asset!("plus"),
         }
     }
 
@@ -125,6 +128,7 @@ mod tests {
             Icon::Info,
             Icon::Image,
             Icon::ArrowDown,
+            Icon::Plus,
         ] {
             let text = std::str::from_utf8(icon.bytes()).unwrap_or_default();
             assert!(text.starts_with("<svg"), "{} is not an svg", icon.name());
